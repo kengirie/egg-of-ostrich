@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NostrEvent } from '@nostrify/nostrify';
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools';
 import { getPow } from 'nostr-tools/nip13';
+import { buildAnswerNoteTemplate } from './answer';
 import {
   buildCrackedTemplate,
   buildHatchTemplate,
@@ -64,6 +65,39 @@ describe('sortClutch', () => {
     expect(eggs).toHaveLength(2);
     expect(byContent.q1.hatch?.content).toBe('new');
     expect(byContent.q2.hatch).toBeUndefined();
+  });
+
+  const answerUrl = 'https://example.nwb.tf/a/0123456789abcdef.html';
+  const answer = (egg: NostrEvent, content: string, key: Uint8Array, t: number, nestId = NEST) =>
+    sign(buildAnswerNoteTemplate({ owner: OWNER, nestId, egg, content, answerUrl }), key, t);
+
+  it('pairs eggs with kind 1 answer notes and their links', () => {
+    const eggs = sortClutch([egg1, egg2, answer(egg2, 'note', ownerKey, 200)], OWNER, NEST, { difficulty: 4 });
+    const byContent = Object.fromEntries(eggs.map((e) => [e.content, e]));
+    expect(byContent.q2.hatch).toMatchObject({ content: 'note', url: answerUrl });
+    expect(byContent.q1.hatch).toBeUndefined();
+  });
+
+  it('lets the newest hatch win across kind 1 and kind 1111', () => {
+    const newer = answer(egg1, 'note', ownerKey, 500);
+    const eggs = sortClutch([egg1, hatchNew, newer], OWNER, NEST, { difficulty: 4 });
+    expect(eggs[0].hatch).toEqual({ id: newer.id, content: 'note', url: answerUrl, createdAt: 500 });
+    const older = answer(egg1, 'note', ownerKey, 100);
+    const eggs2 = sortClutch([egg1, older, hatchNew], OWNER, NEST, { difficulty: 4 });
+    expect(eggs2[0].hatch).toEqual({ id: hatchNew.id, content: 'new', createdAt: 400 });
+  });
+
+  it('ignores kind 1 answers from impostors, other nests or unknown eggs', () => {
+    const unlisted = layAnonymousEgg({ owner: OWNER, nestId: NEST, content: 'unlisted', difficulty: 4 });
+    const events = [
+      egg1,
+      answer(egg1, 'fake', stranger, 600),
+      answer(egg1, 'elsewhere', ownerKey, 700, 'other'),
+      answer(unlisted, 'orphan', ownerKey, 800),
+    ];
+    const eggs = sortClutch(events, OWNER, NEST, { difficulty: 4 });
+    expect(eggs).toHaveLength(1);
+    expect(eggs[0].hatch).toBeUndefined();
   });
 
   it('drops eggs below the PoW threshold', () => {

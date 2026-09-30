@@ -2,6 +2,9 @@ import type { NostrEvent } from '@nostrify/nostrify';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
 import { getPow, minePow } from 'nostr-tools/nip13';
 import { NAMED_SITE_KIND } from './nsite';
+import { HATCH_MAX_LENGTH, parseAnswerNote } from './answer';
+
+export { HATCH_MAX_LENGTH };
 
 /**
  * Egg of Ostriches data model — no custom kinds.
@@ -10,7 +13,8 @@ import { NAMED_SITE_KIND } from './nsite';
  *   `35128:<owner>:<d>` is the NIP-22 root that every egg hangs from.
  * - An **egg** (question) is a top-level kind 1111 comment on the nest, signed
  *   by a throwaway key minted in the browser: fully anonymous, no login.
- * - A **hatch** (answer) is a kind 1111 reply to an egg, signed by the owner.
+ * - A **hatch** (answer) is a kind 1 answer note by the owner quoting the egg
+ *   (see `./answer`). Legacy kind 1111 replies to the egg are still accepted.
  * - **Cracked** (hidden) eggs are listed by the owner in a NIP-78 (kind 30078)
  *   app-data event, so visitors see the same cleaned-up nest.
  */
@@ -23,9 +27,6 @@ export const NEST_TAG = 'egg-of-ostriches';
 
 /** Maximum egg (question) length in characters. */
 export const EGG_MAX_LENGTH = 500;
-/** Maximum hatch (answer) length in characters. */
-export const HATCH_MAX_LENGTH = 2000;
-
 /**
  * NIP-13 proof-of-work every anonymous egg must carry. Throwaway keys make
  * pubkey-based moderation useless, so a little CPU per egg is the spam brake.
@@ -45,6 +46,8 @@ export interface Hatch {
   id: string;
   content: string;
   createdAt: number;
+  /** Answer link (https) from a kind 1 answer note; absent on legacy hatches. */
+  url?: string;
 }
 
 export interface Egg {
@@ -190,12 +193,13 @@ export function parseCrackedIds(event: NostrEvent | undefined): Set<string> {
 }
 
 /**
- * Sort kind 1111 events under a nest into eggs with their hatches. Events are
- * user input: anything malformed is dropped rather than trusted.
+ * Sort events under a nest into eggs with their hatches. Events are user
+ * input: anything malformed is dropped rather than trusted.
  *
- * - Egg: root and parent both the nest, non-empty, carries enough PoW.
- * - Hatch: signed by the owner, root is the nest, parent is a known egg. The
- *   newest hatch wins, so an owner can re-answer.
+ * - Egg: kind 1111, root and parent both the nest, non-empty, enough PoW.
+ * - Hatch: a kind 1 answer note (`parseAnswerNote`) or a legacy kind 1111
+ *   reply, signed by the owner, for a known egg. The newest hatch across both
+ *   formats wins, so an owner can re-answer.
  */
 export function sortClutch(
   events: NostrEvent[],
@@ -206,10 +210,14 @@ export function sortClutch(
   const address = nestAddress(owner, nestId);
   const difficulty = opts.difficulty ?? EGG_POW_DIFFICULTY;
   const eggs = new Map<string, Egg>();
-  const hatches: NostrEvent[] = [];
+  const hatches: (Hatch & { eggId: string })[] = [];
 
   for (const event of events) {
-    if (event.kind !== COMMENT_KIND) continue;
+    if (event.kind !== COMMENT_KIND) {
+      const answer = parseAnswerNote(event, owner, nestId);
+      if (answer) hatches.push(answer);
+      continue;
+    }
     if (tagValue(event, 'A') !== address) continue;
     const parentKind = tagValue(event, 'k');
 
@@ -225,16 +233,15 @@ export function sortClutch(
         createdAt: event.created_at,
       });
     } else if (parentKind === String(COMMENT_KIND) && event.pubkey === owner) {
-      hatches.push(event);
+      const eggId = tagValue(event, 'e');
+      const content = event.content.trim();
+      if (eggId && content) hatches.push({ id: event.id, eggId, content, createdAt: event.created_at });
     }
   }
 
-  for (const event of hatches.sort((a, b) => a.created_at - b.created_at)) {
-    const eggId = tagValue(event, 'e');
-    const egg = eggId ? eggs.get(eggId) : undefined;
-    const content = event.content.trim();
-    if (!egg || !content) continue;
-    egg.hatch = { id: event.id, content, createdAt: event.created_at };
+  for (const { eggId, ...hatch } of hatches.sort((a, b) => a.createdAt - b.createdAt)) {
+    const egg = eggs.get(eggId);
+    if (egg) egg.hatch = hatch;
   }
 
   return Array.from(eggs.values()).sort((a, b) => b.createdAt - a.createdAt);
