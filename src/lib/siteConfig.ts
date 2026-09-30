@@ -21,6 +21,37 @@ export function nestGatewayUrl(pubkeyHex: string, nestId: string, gateway = GATE
   return `https://${pubkeyToBase36(pubkeyHex)}${nestId}.${gateway}/`;
 }
 
+/** An answer page's slug: the first 16 hex chars of the answered egg's id. */
+const ANSWER_SLUG_RE = /^[0-9a-f]{16}$/;
+
+export function isAnswerSlug(value: string): boolean {
+  return ANSWER_SLUG_RE.test(value);
+}
+
+export function answerSlug(eggId: string): string {
+  if (!/^[0-9a-f]{64}$/.test(eggId)) throw new Error(`Refusing bad egg id: ${eggId}`);
+  return eggId.slice(0, 16);
+}
+
+/**
+ * Where an answer page lives inside the nest's nsite. The `.html` extension is
+ * required: gateways serve extensionless paths with the wrong MIME type.
+ */
+export function answerPaths(slug: string): { html: string; png: string } {
+  if (!isAnswerSlug(slug)) throw new Error(`Refusing bad answer slug: ${slug}`);
+  return { html: `/a/${slug}.html`, png: `/a/${slug}.png` };
+}
+
+/** Canonical URL of the answer page for `eggId`, the link shared in the kind 1 note. */
+export function answerGatewayUrl(
+  pubkeyHex: string,
+  nestId: string,
+  eggId: string,
+  gateway = GATEWAY_DOMAIN,
+): string {
+  return new URL(answerPaths(answerSlug(eggId)).html, nestGatewayUrl(pubkeyHex, nestId, gateway)).toString();
+}
+
 /**
  * Optional: the app itself deployed as a named nsite (identifier "ostrich") by
  * this hex pubkey. Only used as a fallback source of `site-assets.json` when the
@@ -44,19 +75,23 @@ export function appNsiteUrl(gateway: string, path: string): string | undefined {
 export interface NestSiteTarget {
   npub: string;
   nestId: string;
+  /** Set when served from a baked answer page (`/a/<slug>.html`). */
+  answerSlug?: string;
 }
 
 /**
  * When the app is served from a nest's own nsite, its baked index.html tags the
  * nest via `<meta name="egg:npub|egg:id">` so the SPA opens that nest at "/".
- * Meta tags (not an inline script) keep `script-src 'self'` intact.
+ * Meta tags (not an inline script) keep `script-src 'self'` intact. Answer
+ * pages add `<meta name="egg:answer">` so the SPA opens that answer instead.
  */
 export function getNestSiteTarget(): NestSiteTarget | null {
   if (typeof document === 'undefined') return null;
   const npub = document.querySelector('meta[name="egg:npub"]')?.getAttribute('content');
   const nestId = document.querySelector('meta[name="egg:id"]')?.getAttribute('content');
-  if (npub && nestId) return { npub, nestId };
-  return null;
+  if (!npub || !nestId) return null;
+  const answer = document.querySelector('meta[name="egg:answer"]')?.getAttribute('content');
+  return answer && isAnswerSlug(answer) ? { npub, nestId, answerSlug: answer } : { npub, nestId };
 }
 
 /** On a nest's own site "/" is the nest, so the app home lives at /home. */

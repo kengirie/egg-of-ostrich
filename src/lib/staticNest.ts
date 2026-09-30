@@ -14,7 +14,7 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-function assertHttpUrl(value: string): string {
+export function assertHttpUrl(value: string): string {
   const url = new URL(value);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     throw new Error(`Refusing non-http URL in static nest: ${value}`);
@@ -23,7 +23,7 @@ function assertHttpUrl(value: string): string {
 }
 
 /** Root-relative same-origin app asset, e.g. "/assets/index-abc.js". */
-function assertAssetRef(value: string): string {
+export function assertAssetRef(value: string): string {
   if (!/^\/[A-Za-z0-9/._-]+\.(js|css)$/.test(value)) {
     throw new Error(`Refusing suspicious asset ref: ${value}`);
   }
@@ -31,7 +31,7 @@ function assertAssetRef(value: string): string {
 }
 
 /** Same policy as the app's own index.html: scripts only from same-origin. */
-const NEST_SITE_CSP =
+export const NEST_SITE_CSP =
   "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "frame-src 'self' https:; font-src 'self'; base-uri 'self'; manifest-src 'self'; " +
   "connect-src 'self' blob: https: wss:; img-src 'self' data: blob: https:; media-src 'self' https:";
