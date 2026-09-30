@@ -60,7 +60,7 @@ function assetSources(): AssetSource[] {
   return sources;
 }
 
-function isSiteAssets(data: unknown): data is Pick<SiteAssets, 'scripts' | 'styles' | 'assets'> {
+export function isSiteAssets(data: unknown): data is Pick<SiteAssets, 'scripts' | 'styles' | 'assets'> {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
   return (

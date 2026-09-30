@@ -12,21 +12,11 @@ import { ThrowEggForm } from '@/components/egg/ThrowEggForm';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useClutch, useNest } from '@/hooks/useEggs';
-import { isValidNestId } from '@/lib/egg';
+import { decodeNpub, isValidNestId } from '@/lib/egg';
 import { sanitizeUrl } from '@/lib/sanitizeUrl';
 import { nestGatewayUrl } from '@/lib/siteConfig';
 import { cn } from '@/lib/utils';
 import NotFound from './NotFound';
-
-function decodeNpub(npub: string | undefined): string | undefined {
-  if (!npub) return undefined;
-  try {
-    const decoded = nip19.decode(npub);
-    return decoded.type === 'npub' ? decoded.data : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export default function NestPage(props: { npub?: string; nestId?: string }) {
   const params = useParams<{ npub: string; nestId: string }>();
@@ -134,7 +124,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
           </div>
           <ClutchList loading={clutch.isLoading} error={clutch.isError} onRetry={() => clutch.refetch()} empty={tab === 'warm' ? 'まだ卵がありません。リンクをシェアして投げてもらおう！' : 'まだ孵った卵はありません。'}>
             {(tab === 'warm' ? warm : hatched).map((egg) => (
-              <OwnerEggCard key={egg.id} egg={egg} nestId={nestId} />
+              <OwnerEggCard key={egg.id} egg={egg} nestId={nestId} ownerName={ownerName} onHatched={() => setTab('hatched')} />
             ))}
           </ClutchList>
         </section>

@@ -3,13 +3,14 @@ import { useSeoMeta } from '@unhead/react';
 import { nip19 } from 'nostr-tools';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AnswerLink } from '@/components/egg/EggCards';
 import { EggShape } from '@/components/egg/EggShape';
 import { Layout } from '@/components/egg/Layout';
 import { Ostrich } from '@/components/egg/Ostrich';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useMyNests, useRecentHatches, type RecentHatch } from '@/hooks/useEggs';
-import { nestGatewayUrl } from '@/lib/siteConfig';
+import { answerSlug, nestGatewayUrl } from '@/lib/siteConfig';
 import { timeAgo } from '@/lib/time';
 
 const Index = () => {
@@ -120,7 +121,7 @@ function RecentHatches() {
       <div className="mt-4 grid gap-5 sm:grid-cols-2">
         {hatches.isLoading
           ? [0, 1].map((i) => <Skeleton key={i} className="h-36 rounded-3xl" />)
-          : hatches.data!.map((h, i) => <RecentHatchCard key={`${h.owner}${h.nestId}${h.createdAt}`} hatch={h} index={i} />)}
+          : hatches.data!.map((h, i) => <RecentHatchCard key={h.eggId} hatch={h} index={i} />)}
       </div>
     </section>
   );
@@ -129,17 +130,25 @@ function RecentHatches() {
 function RecentHatchCard({ hatch, index }: { hatch: RecentHatch; index: number }) {
   const author = useAuthor(hatch.owner);
   const name = author.data?.metadata?.display_name || author.data?.metadata?.name || 'ダチョウ';
+  const npub = nip19.npubEncode(hatch.owner);
   return (
-    <Link
-      to={`/${nip19.npubEncode(hatch.owner)}/${hatch.nestId}`}
-      className={`sticker block rounded-3xl bg-card p-5 transition-transform hover:rotate-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring ${index % 2 ? 'rotate-1' : '-rotate-1'}`}
+    <article
+      className={`sticker rounded-3xl bg-card p-5 transition-transform hover:rotate-0 ${index % 2 ? 'rotate-1' : '-rotate-1'}`}
     >
-      <p className="line-clamp-3 font-extrabold break-words">🥚 {hatch.question}</p>
-      <p className="mt-3 line-clamp-3 rounded-2xl bg-secondary px-3 py-2 break-words text-secondary-foreground">🐣 {hatch.answer}</p>
-      <p className="mt-2 text-xs font-bold text-muted-foreground">
-        {name} の巣 · {timeAgo(hatch.createdAt)}
-      </p>
-    </Link>
+      <Link
+        to={`/${npub}/${hatch.nestId}/a/${answerSlug(hatch.eggId)}`}
+        className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring"
+      >
+        <p className="line-clamp-3 font-extrabold break-words">🥚 {hatch.question}</p>
+        <p className="mt-3 line-clamp-3 rounded-2xl bg-secondary px-3 py-2 break-words text-secondary-foreground">🐣 {hatch.answer}</p>
+      </Link>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
+        <Link to={`/${npub}/${hatch.nestId}`} className="hover:underline">
+          {name} の巣 · {timeAgo(hatch.createdAt)}
+        </Link>
+        <AnswerLink url={hatch.url} className="text-xs text-foreground" />
+      </div>
+    </article>
   );
 }
 

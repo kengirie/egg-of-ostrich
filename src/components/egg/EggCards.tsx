@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Check, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -13,12 +13,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useCrackEgg, useHatchEgg } from '@/hooks/useEggs';
+import { useCrackEgg } from '@/hooks/useEggs';
+import { usePublishAnswer, type AnswerStep } from '@/hooks/usePublishAnswer';
 import { useToast } from '@/hooks/useToast';
 import { HATCH_MAX_LENGTH, type Egg } from '@/lib/egg';
 import { timeAgo } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { EggShape } from './EggShape';
+import { ShareLink } from './ShareLink';
 
 const TILTS = ['rotate-1', '-rotate-1', 'rotate-[0.5deg]', '-rotate-[1.5deg]'];
 
@@ -39,10 +41,25 @@ export function HatchedEggCard({ egg, ownerName, index = 0 }: { egg: Egg; ownerN
           <div className="sticker-sm relative min-w-0 flex-1 rounded-2xl bg-secondary px-4 py-3 text-secondary-foreground">
             <p className="text-xs font-bold opacity-80">{ownerName} が孵した · {timeAgo(egg.hatch.createdAt)}</p>
             <p className="mt-1 whitespace-pre-wrap break-words">{egg.hatch.content}</p>
+            <AnswerLink url={egg.hatch.url} className="mt-2" />
           </div>
         </div>
       )}
     </article>
+  );
+}
+
+/** "回答リンク": the answer page (OGP card) on the nest's nsite. `url` is already sanitized. */
+export function AnswerLink({ url, className }: { url: string; className?: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn('inline-flex items-center gap-1 text-sm font-extrabold underline underline-offset-4', className)}
+    >
+      <ExternalLink className="size-3.5" /> 回答リンク
+    </a>
   );
 }
 
@@ -59,20 +76,70 @@ export function SealedEgg({ index }: { index: number }) {
   );
 }
 
-/** Owner's view of an unanswered egg: hatch it (answer) or crack it (hide). */
-export function OwnerEggCard({ egg, nestId }: { egg: Egg; nestId: string }) {
+const ANSWER_STEPS: { step: AnswerStep; label: string }[] = [
+  { step: 'drawing', label: '卵の絵を描いています' },
+  { step: 'uploading', label: '回答ページをこしらえています' },
+  { step: 'announcing', label: '巣に回答ページを置いています' },
+  { step: 'posting', label: 'タイムラインに孵しています' },
+];
+
+/** Playful checklist of the answer publish steps. */
+function AnswerProgress({ step }: { step: AnswerStep }) {
+  const current = ANSWER_STEPS.findIndex((s) => s.step === step);
+  return (
+    <ol className="sticker-sm space-y-1.5 rounded-2xl bg-shell px-4 py-3 text-sm font-bold" aria-live="polite">
+      {ANSWER_STEPS.map(({ step: key, label }, i) => (
+        <li
+          key={key}
+          className={cn('flex items-center gap-2', i > current && 'text-muted-foreground opacity-60')}
+        >
+          {i < current ? (
+            <Check className="size-4 text-primary" />
+          ) : i === current ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <span className="inline-block size-4 text-center">·</span>
+          )}
+          {label}
+          {i === current && '…'}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * Owner's view of an egg: hatch it (answer), re-answer it, or crack it (hide).
+ * Hatching bakes an answer page into the nest and posts a kind 1 note linking to it.
+ */
+export function OwnerEggCard({
+  egg,
+  nestId,
+  ownerName,
+  onHatched,
+}: {
+  egg: Egg;
+  nestId: string;
+  ownerName: string;
+  /** Called after a successful answer (e.g. to jump to the hatched tab). */
+  onHatched?: () => void;
+}) {
   const [answer, setAnswer] = useState(egg.hatch?.content ?? '');
   const [open, setOpen] = useState(!egg.hatch);
-  const hatch = useHatchEgg(nestId);
+  const hatch = usePublishAnswer(nestId);
   const crack = useCrackEgg(nestId);
   const { toast } = useToast();
 
   const onHatch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await hatch.mutateAsync({ egg, content: answer });
+      await hatch.publish({ egg, content: answer, ownerName });
       setOpen(false);
-      toast({ title: 'ピヨッ！卵が孵りました 🐣' });
+      onHatched?.();
+      toast({
+        title: 'ピヨッ！卵が孵りました 🐣',
+        description: '回答リンクつきの kind 1 ノートをタイムラインに投稿しました。',
+      });
     } catch (err) {
       toast({ title: '孵化に失敗…', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
@@ -85,6 +152,13 @@ export function OwnerEggCard({ egg, nestId }: { egg: Egg; nestId: string }) {
     } catch (err) {
       toast({ title: '割れませんでした', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
+  };
+
+  const answerUrl = hatch.result?.answerUrl ?? egg.hatch?.url;
+
+  const reopen = () => {
+    hatch.reset();
+    setOpen(true);
   };
 
   return (
@@ -100,9 +174,20 @@ export function OwnerEggCard({ egg, nestId }: { egg: Egg; nestId: string }) {
       {egg.hatch && !open && (
         <div className="mt-3 rounded-2xl bg-secondary px-4 py-3 text-secondary-foreground">
           <p className="whitespace-pre-wrap break-words">{egg.hatch.content}</p>
-          <button type="button" onClick={() => setOpen(true)} className="mt-2 text-sm font-bold underline">
+          <button type="button" onClick={reopen} className="mt-2 text-sm font-bold underline">
             回答を書き直す
           </button>
+        </div>
+      )}
+
+      {answerUrl && !open && (
+        <div className="mt-3 space-y-2">
+          <ShareLink url={answerUrl} label="回答リンク（シェアすると回答カードが表示されます）" />
+          {hatch.result && (
+            <p className="text-sm font-bold text-muted-foreground motion-safe:animate-hatch">
+              📣 回答をこのリンクつきの kind 1 ノートとしてタイムラインに投稿しました。
+            </p>
+          )}
         </div>
       )}
 
@@ -114,13 +199,34 @@ export function OwnerEggCard({ egg, nestId }: { egg: Egg; nestId: string }) {
             onChange={(e) => setAnswer(e.target.value)}
             maxLength={HATCH_MAX_LENGTH}
             rows={3}
-            placeholder="あたためて、孵そう（回答はあなたの鍵で公開されます）"
+            disabled={hatch.isPending}
+            placeholder="あたためて、孵そう（回答はあなたの鍵で kind 1 のノートとして公開されます）"
             className="sticker-sm rounded-2xl bg-shell"
           />
+          {hatch.isPending && <AnswerProgress step={hatch.step} />}
+          {hatch.step === 'error' && hatch.error && (
+            <p className="text-sm font-bold text-destructive">うまく孵りませんでした：{hatch.error}</p>
+          )}
+          {hatch.failedServers.length > 0 && (
+            <p className="text-xs font-bold text-muted-foreground">
+              一部のBlossomサーバーには置けませんでした：{hatch.failedServers.join(', ')}
+            </p>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
+            {egg.hatch && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="rounded-full font-bold"
+                disabled={hatch.isPending}
+                onClick={() => setOpen(false)}
+              >
+                やめる
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button type="button" variant="outline" className="sticker-sm rounded-full font-bold" disabled={crack.isPending}>
+                <Button type="button" variant="outline" className="sticker-sm rounded-full font-bold" disabled={crack.isPending || hatch.isPending}>
                   {crack.isPending ? <Loader2 className="size-4 animate-spin" /> : '🔨'} 割る
                 </Button>
               </AlertDialogTrigger>
