@@ -86,6 +86,32 @@ async function pinnedAssetIndex(manifest: NostrEvent, servers: string[]): Promis
 }
 
 /**
+ * Answers to one nest are published one at a time: each rebuilds the nest
+ * manifest from the previous one, so two concurrent rebuilds would drop each
+ * other's `/a/<slug>` paths.
+ */
+const nestLocks = new Map<string, Promise<unknown>>();
+/** The manifest we last published per nest, in case a relay still serves an older one. */
+const lastManifests = new Map<string, NostrEvent>();
+
+function exclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const run = (nestLocks.get(key) ?? Promise.resolve()).catch(() => undefined).then(fn);
+  nestLocks.set(key, run);
+  run
+    .finally(() => {
+      if (nestLocks.get(key) === run) nestLocks.delete(key);
+    })
+    .catch(() => undefined);
+  return run;
+}
+
+interface AnswerInput {
+  egg: Egg;
+  content: string;
+  ownerName: string;
+}
+
+/**
  * The owner answers (hatches) an egg:
  *
  * 1. draw the answer OG card and bake `/a/<slug>.html` (the app + OG meta),
@@ -103,8 +129,8 @@ export function usePublishAnswer(nestId: string | undefined) {
 
   const reset = useCallback(() => setState(IDLE), []);
 
-  const publish = useCallback(
-    async ({ egg, content, ownerName }: { egg: Egg; content: string; ownerName: string }): Promise<PublishAnswerResult> => {
+  const publishNow = useCallback(
+    async ({ egg, content, ownerName }: AnswerInput): Promise<PublishAnswerResult> => {
       try {
         if (!user || !nestId) throw new Error('Only the nest owner can hatch eggs');
         const owner = user.pubkey;
@@ -122,11 +148,12 @@ export function usePublishAnswer(nestId: string | undefined) {
         };
 
         setState({ ...IDLE, step: 'drawing' });
-        const manifest = newest(
-          await nostr.query([{ kinds: [NAMED_SITE_KIND], authors: [owner], '#d': [nestId], limit: 1 }], {
-            signal: AbortSignal.timeout(8000),
-          }),
-        );
+        const lockKey = `${owner}:${nestId}`;
+        const fetched = await nostr.query([{ kinds: [NAMED_SITE_KIND], authors: [owner], '#d': [nestId], limit: 1 }], {
+          signal: AbortSignal.timeout(8000),
+        });
+        const known = lastManifests.get(lockKey);
+        const manifest = newest(known ? [...fetched, known] : fetched);
         const nest = manifest ? parseNest(manifest) : null;
         if (!manifest || !nest || manifest.pubkey !== owner) throw new Error('巣のマニフェストが見つかりませんでした');
 
@@ -174,9 +201,16 @@ export function usePublishAnswer(nestId: string | undefined) {
           { path: paths.png, sha256: og.sha256 },
           ...assets.extraPaths,
         ]);
+        // The gateway must find the new blobs: list every server that took both.
+        const listed = new Set(template.tags.filter(([name]) => name === 'server').map(([, url]) => url));
+        const tookBoth = page.results
+          .filter((r) => r.ok && og.results.some((o) => o.ok && o.server === r.server))
+          .map((r) => r.server);
+        for (const server of tookBoth) if (!listed.has(server)) template.tags.push(['server', server]);
         // A replaceable event must be strictly newer than the one it replaces.
         const createdAt = Math.max(Math.floor(Date.now() / 1000), manifest.created_at + 1);
         const newManifest = await publishEvent({ ...template, created_at: createdAt });
+        lastManifests.set(lockKey, newManifest);
         try {
           await nostr.event(newManifest, { relays: LOOKUP_RELAYS, signal: AbortSignal.timeout(5000) });
         } catch {
@@ -207,6 +241,14 @@ export function usePublishAnswer(nestId: string | undefined) {
       }
     },
     [user, nestId, config.blossomServerMetadata, config.useAppBlossomServers, nostr, publishEvent, queryClient],
+  );
+
+  const publish = useCallback(
+    (input: AnswerInput): Promise<PublishAnswerResult> => {
+      setState({ ...IDLE, step: 'drawing' });
+      return exclusive(`${user?.pubkey ?? ''}:${nestId ?? ''}`, () => publishNow(input));
+    },
+    [publishNow, user?.pubkey, nestId],
   );
 
   const isPending = state.step !== 'idle' && state.step !== 'done' && state.step !== 'error';
