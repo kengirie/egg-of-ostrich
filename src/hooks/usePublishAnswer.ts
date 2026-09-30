@@ -36,7 +36,7 @@ const IDLE: AnswerState = { step: 'idle', failedServers: [], error: null, result
 interface AssetIndex {
   scripts: string[];
   styles: string[];
-  /** Assets that must be added to the manifest (only when falling back to the live app). */
+  /** Assets that must be added to the manifest (the live build's; empty for the pinned one). */
   extraPaths: SitePath[];
 }
 
@@ -62,9 +62,8 @@ function manifestServers(manifest: NostrEvent, extra: string[]): string[] {
 
 /**
  * The app build the nest already pins: its `/site-assets.json` blob, fetched
- * straight from Blossom and verified against the manifest hash. Reusing it
- * means the answer page boots the exact same app as the nest page and needs no
- * new asset paths.
+ * straight from Blossom and verified against the manifest hash. Fallback for
+ * when the live app's asset index can't be loaded; needs no new asset paths.
  */
 async function pinnedAssetIndex(manifest: NostrEvent, servers: string[]): Promise<AssetIndex | null> {
   const sha = manifest.tags.find(([name, path]) => name === 'path' && path === '/site-assets.json')?.[2];
@@ -169,9 +168,12 @@ export function usePublishAnswer(nestId: string | undefined) {
         );
 
         setState((prev) => ({ ...prev, step: 'uploading' }));
-        let assets = await pinnedAssetIndex(manifest, servers);
-        if (!assets) {
-          // Old nest without an index (or its blob is gone): pin the live app build.
+        // Prefer the live app build: a nest published before answer pages
+        // existed pins an app that has no /a/<slug>.html route. Hashed asset
+        // names let both builds live side by side in one manifest. Fall back to
+        // the nest's pinned build when the live index is unreachable.
+        let assets: AssetIndex | null = null;
+        try {
           const live = await fetchSiteAssets();
           await ensureAppAssets({ assets: live.assets, servers, signer: user.signer, assetBase: live.assetBase });
           assets = {
@@ -179,7 +181,11 @@ export function usePublishAnswer(nestId: string | undefined) {
             styles: live.styles,
             extraPaths: live.assets.map((a: SiteAsset) => ({ path: a.path, sha256: a.sha256 })),
           };
+        } catch (err) {
+          console.warn('Live app assets unavailable, using the nest\'s pinned build:', err);
+          assets = await pinnedAssetIndex(manifest, servers);
         }
+        if (!assets) throw new Error('アプリ本体の資産が見つかりませんでした');
         const html = renderAnswerAppHtml({
           ownerName,
           nestTitle: nest.title,
