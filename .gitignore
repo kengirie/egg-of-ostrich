@@ -34,3 +34,4 @@ yarn.lock
 .env.*
 !.env.example
 *.local.json
+.claude/worktrees/
