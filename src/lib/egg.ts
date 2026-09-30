@@ -1,5 +1,5 @@
 import type { NostrEvent } from '@nostrify/nostrify';
-import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools';
+import { finalizeEvent, generateSecretKey, getPublicKey, nip19 } from 'nostr-tools';
 import { getPow, minePow } from 'nostr-tools/nip13';
 import { NAMED_SITE_KIND } from './nsite';
 import { HATCH_MAX_LENGTH, parseAnswerNote } from './answer';
@@ -14,7 +14,7 @@ export { HATCH_MAX_LENGTH };
  * - An **egg** (question) is a top-level kind 1111 comment on the nest, signed
  *   by a throwaway key minted in the browser: fully anonymous, no login.
  * - A **hatch** (answer) is a kind 1 answer note by the owner quoting the egg
- *   (see `./answer`). Legacy kind 1111 replies to the egg are still accepted.
+ *   (see `./answer`) linking to an answer page baked into the nest's nsite.
  * - **Cracked** (hidden) eggs are listed by the owner in a NIP-78 (kind 30078)
  *   app-data event, so visitors see the same cleaned-up nest.
  */
@@ -46,8 +46,8 @@ export interface Hatch {
   id: string;
   content: string;
   createdAt: number;
-  /** Answer link (https) from a kind 1 answer note; absent on legacy hatches. */
-  url?: string;
+  /** Answer link (https) from the kind 1 answer note. */
+  url: string;
 }
 
 export interface Egg {
@@ -145,31 +145,6 @@ export function layAnonymousEgg(opts: {
   return event;
 }
 
-/** The owner's answer: a NIP-22 reply whose parent is the egg. */
-export function buildHatchTemplate(opts: {
-  owner: string;
-  nestId: string;
-  egg: Pick<Egg, 'id' | 'pubkey'>;
-  content: string;
-}): { kind: number; content: string; tags: string[][] } {
-  const content = opts.content.trim();
-  if (!content) throw new Error('An answer cannot be empty');
-  if (content.length > HATCH_MAX_LENGTH) throw new Error(`Answers hold at most ${HATCH_MAX_LENGTH} characters`);
-  const address = nestAddress(opts.owner, opts.nestId);
-  return {
-    kind: COMMENT_KIND,
-    content,
-    tags: [
-      ['A', address],
-      ['K', String(NAMED_SITE_KIND)],
-      ['P', opts.owner],
-      ['e', opts.egg.id, '', opts.egg.pubkey],
-      ['k', String(COMMENT_KIND)],
-      ['p', opts.egg.pubkey],
-    ],
-  };
-}
-
 /** NIP-78 list of eggs the owner cracked (hid). Replaces the previous list. */
 export function buildCrackedTemplate(nestId: string, eggIds: string[]): {
   kind: number;
@@ -197,9 +172,8 @@ export function parseCrackedIds(event: NostrEvent | undefined): Set<string> {
  * input: anything malformed is dropped rather than trusted.
  *
  * - Egg: kind 1111, root and parent both the nest, non-empty, enough PoW.
- * - Hatch: a kind 1 answer note (`parseAnswerNote`) or a legacy kind 1111
- *   reply, signed by the owner, for a known egg. The newest hatch across both
- *   formats wins, so an owner can re-answer.
+ * - Hatch: a kind 1 answer note (`parseAnswerNote`) signed by the owner for
+ *   a known egg. The newest one wins, so an owner can re-answer.
  */
 export function sortClutch(
   events: NostrEvent[],
@@ -219,24 +193,17 @@ export function sortClutch(
       continue;
     }
     if (tagValue(event, 'A') !== address) continue;
-    const parentKind = tagValue(event, 'k');
-
-    if (parentKind === String(NAMED_SITE_KIND)) {
-      const content = event.content.trim();
-      if (!content || tagValue(event, 'a') !== address) continue;
-      if (getPow(event.id) < difficulty) continue;
-      if (opts.cracked?.has(event.id)) continue;
-      eggs.set(event.id, {
-        id: event.id,
-        pubkey: event.pubkey,
-        content: content.slice(0, EGG_MAX_LENGTH),
-        createdAt: event.created_at,
-      });
-    } else if (parentKind === String(COMMENT_KIND) && event.pubkey === owner) {
-      const eggId = tagValue(event, 'e');
-      const content = event.content.trim();
-      if (eggId && content) hatches.push({ id: event.id, eggId, content, createdAt: event.created_at });
-    }
+    if (tagValue(event, 'k') !== String(NAMED_SITE_KIND)) continue;
+    const content = event.content.trim();
+    if (!content || tagValue(event, 'a') !== address) continue;
+    if (getPow(event.id) < difficulty) continue;
+    if (opts.cracked?.has(event.id)) continue;
+    eggs.set(event.id, {
+      id: event.id,
+      pubkey: event.pubkey,
+      content: content.slice(0, EGG_MAX_LENGTH),
+      createdAt: event.created_at,
+    });
   }
 
   for (const { eggId, ...hatch } of hatches.sort((a, b) => a.createdAt - b.createdAt)) {
@@ -245,4 +212,15 @@ export function sortClutch(
   }
 
   return Array.from(eggs.values()).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Hex pubkey from an `npub1…` string (e.g. a URL param), or undefined if invalid. */
+export function decodeNpub(npub: string | undefined): string | undefined {
+  if (!npub) return undefined;
+  try {
+    const decoded = nip19.decode(npub);
+    return decoded.type === 'npub' ? decoded.data : undefined;
+  } catch {
+    return undefined;
+  }
 }

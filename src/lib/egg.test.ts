@@ -5,7 +5,6 @@ import { getPow } from 'nostr-tools/nip13';
 import { buildAnswerNoteTemplate } from './answer';
 import {
   buildCrackedTemplate,
-  buildHatchTemplate,
   isValidNestId,
   layAnonymousEgg,
   nestAddress,
@@ -54,19 +53,7 @@ describe('layAnonymousEgg', () => {
 describe('sortClutch', () => {
   const egg1 = layAnonymousEgg({ owner: OWNER, nestId: NEST, content: 'q1', difficulty: 4 });
   const egg2 = layAnonymousEgg({ owner: OWNER, nestId: NEST, content: 'q2', difficulty: 4 });
-  const hatchOld = sign(buildHatchTemplate({ owner: OWNER, nestId: NEST, egg: egg1, content: 'old' }), ownerKey, 300);
-  const hatchNew = sign(buildHatchTemplate({ owner: OWNER, nestId: NEST, egg: egg1, content: 'new' }), ownerKey, 400);
   const stranger = generateSecretKey();
-  const fakeHatch = sign(buildHatchTemplate({ owner: OWNER, nestId: NEST, egg: egg2, content: 'fake' }), stranger, 500);
-
-  it('pairs eggs with the owner’s newest hatch and ignores impostors', () => {
-    const eggs = sortClutch([egg1, egg2, hatchNew, hatchOld, fakeHatch], OWNER, NEST, { difficulty: 4 });
-    const byContent = Object.fromEntries(eggs.map((e) => [e.content, e]));
-    expect(eggs).toHaveLength(2);
-    expect(byContent.q1.hatch?.content).toBe('new');
-    expect(byContent.q2.hatch).toBeUndefined();
-  });
-
   const answerUrl = 'https://example.nwb.tf/a/0123456789abcdef.html';
   const answer = (egg: NostrEvent, content: string, key: Uint8Array, t: number, nestId = NEST) =>
     sign(buildAnswerNoteTemplate({ owner: OWNER, nestId, egg, content, answerUrl }), key, t);
@@ -78,13 +65,33 @@ describe('sortClutch', () => {
     expect(byContent.q1.hatch).toBeUndefined();
   });
 
-  it('lets the newest hatch win across kind 1 and kind 1111', () => {
-    const newer = answer(egg1, 'note', ownerKey, 500);
-    const eggs = sortClutch([egg1, hatchNew, newer], OWNER, NEST, { difficulty: 4 });
-    expect(eggs[0].hatch).toEqual({ id: newer.id, content: 'note', url: answerUrl, createdAt: 500 });
-    const older = answer(egg1, 'note', ownerKey, 100);
-    const eggs2 = sortClutch([egg1, older, hatchNew], OWNER, NEST, { difficulty: 4 });
-    expect(eggs2[0].hatch).toEqual({ id: hatchNew.id, content: 'new', createdAt: 400 });
+  it('lets the owner’s newest answer win', () => {
+    const older = answer(egg1, 'old', ownerKey, 300);
+    const newer = answer(egg1, 'new', ownerKey, 400);
+    const eggs = sortClutch([egg1, newer, older], OWNER, NEST, { difficulty: 4 });
+    expect(eggs[0].hatch).toEqual({ id: newer.id, content: 'new', url: answerUrl, createdAt: 400 });
+  });
+
+  it('ignores legacy kind 1111 replies from the owner', () => {
+    const legacy = sign(
+      {
+        kind: 1111,
+        content: 'legacy',
+        tags: [
+          ['A', nestAddress(OWNER, NEST)],
+          ['K', '35128'],
+          ['P', OWNER],
+          ['e', egg1.id, '', egg1.pubkey],
+          ['k', '1111'],
+          ['p', egg1.pubkey],
+        ],
+      },
+      ownerKey,
+      300,
+    );
+    const eggs = sortClutch([egg1, legacy], OWNER, NEST, { difficulty: 4 });
+    expect(eggs).toHaveLength(1);
+    expect(eggs[0].hatch).toBeUndefined();
   });
 
   it('ignores kind 1 answers from impostors, other nests or unknown eggs', () => {
