@@ -23,7 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="relative isolate flex min-h-screen flex-col overflow-x-hidden">
       {/* the savanna */}
       <div aria-hidden className="pointer-events-none absolute -top-24 -right-24 -z-10 size-72 rounded-full bg-[#ffc94a] opacity-80 dark:bg-[#fff3c4] dark:opacity-30" />
-      <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-24 border-t-[3px] border-border bg-[#e9cf93] dark:bg-[#2c2a4a]" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-20 border-t-[3px] border-border bg-[#e9cf93] dark:bg-[#2c2a4a]" />
 
       <header className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Logo />

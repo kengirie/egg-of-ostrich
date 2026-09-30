@@ -5,6 +5,7 @@ import { NostrContext } from '@nostrify/react';
 import { NUser, useNostrLogin } from '@nostrify/react/login';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
+import { PROFILE_KINDS, PROFILE_RELAYS } from '@/lib/appRelays';
 
 interface NostrProviderProps {
   children: React.ReactNode;
@@ -78,6 +79,11 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
         routes.set(url, filters);
       }
 
+      // Profile aggregators only see profile-only queries (see PROFILE_RELAYS).
+      if (filters.every((f) => f.kinds?.length && f.kinds.every((k) => PROFILE_KINDS.has(k)))) {
+        for (const url of PROFILE_RELAYS) routes.set(url, filters);
+      }
+
       return routes;
     },
     eventRouter(_event: NostrEvent) {
@@ -90,7 +96,9 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
 
       return [...allRelays];
     },
-    eoseTimeout: 200,
+    // Wait a little for slower relays after the first EOSE: a cold connection
+    // (TLS + NIP-42 AUTH) easily takes longer than the template's 200ms.
+    eoseTimeout: 1000,
   }));
 
   // Derive the current signer from the active login. This mirrors the

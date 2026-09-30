@@ -132,7 +132,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
               </button>
             ))}
           </div>
-          <ClutchList loading={clutch.isLoading} empty={tab === 'warm' ? 'まだ卵がありません。リンクをシェアして投げてもらおう！' : 'まだ孵った卵はありません。'}>
+          <ClutchList loading={clutch.isLoading} error={clutch.isError} onRetry={() => clutch.refetch()} empty={tab === 'warm' ? 'まだ卵がありません。リンクをシェアして投げてもらおう！' : 'まだ孵った卵はありません。'}>
             {(tab === 'warm' ? warm : hatched).map((egg) => (
               <OwnerEggCard key={egg.id} egg={egg} nestId={nestId} />
             ))}
@@ -157,7 +157,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
           <div>
             <h2 className="text-xl font-extrabold">孵った卵</h2>
             <div className="mt-4">
-              <ClutchList loading={clutch.isLoading} empty="まだ孵った卵はありません。最初の卵を投げてみよう！">
+              <ClutchList loading={clutch.isLoading} error={clutch.isError} onRetry={() => clutch.refetch()} empty="まだ孵った卵はありません。最初の卵を投げてみよう！">
                 {hatched.map((egg, i) => (
                   <HatchedEggCard key={egg.id} egg={egg} ownerName={ownerName} index={i} />
                 ))}
@@ -176,7 +176,32 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
   );
 }
 
-function ClutchList({ loading, empty, children }: { loading: boolean; empty: string; children: React.ReactNode[] }) {
+function ClutchList({
+  loading,
+  error,
+  onRetry,
+  empty,
+  children,
+}: {
+  loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+  empty: string;
+  children: React.ReactNode[];
+}) {
+  if (error && children.length === 0) {
+    return (
+      <div className="rounded-3xl border-[3px] border-dashed border-destructive px-6 py-10 text-center">
+        <Ostrich className="mx-auto h-24 w-20" mood="shock" bobbing={false} />
+        <p className="mt-3 font-bold">卵を探しに行ったダチョウが迷子になりました（リレーに届きませんでした）。</p>
+        {onRetry && (
+          <button type="button" onClick={onRetry} className="mt-3 font-extrabold text-primary underline">
+            もう一度探す
+          </button>
+        )}
+      </div>
+    );
+  }
   if (loading) {
     return (
       <div className="grid gap-5">

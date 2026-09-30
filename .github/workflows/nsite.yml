@@ -1,0 +1,52 @@
+name: Publish app to nsite (Nostr/Blossom)
+
+# Publishes the app itself as the NIP-5A named site "ostrich"
+# (https://<pubkeyB36>ostrich.<gateway>/). Ported from Rostrum's nsite.yml.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: "nsite"
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies and build
+        # Optional: set the APP_NSITE_PUBKEY repo variable (hex) so non-root
+        # hosts can fall back to this nsite for site-assets.json.
+        env:
+          VITE_APP_NSITE_PUBKEY: ${{ vars.APP_NSITE_PUBKEY }}
+        run: |
+          npm install
+          npm run build
+
+      - name: Publish to Nostr/Blossom
+        uses: sandwichfarm/nsite-action@v0.5.1
+        with:
+          # Raw Nostr private key (nsec1... or hex) stored as the NOSTR_SEC
+          # repository secret. Use a dedicated key for this project.
+          sec: ${{ secrets.NOSTR_SEC }}
+          directory: "./dist"
+          version: "v0.27.0"
+          name: "ostrich"
+          fallback: "/index.html"
+          relays: |
+            wss://nos.lol
+            wss://nostr.mom
+            wss://relay.ditto.pub
+            wss://relay.dreamith.to
+          servers: |
+            https://blossoml3001.site

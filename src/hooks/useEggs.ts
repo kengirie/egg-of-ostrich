@@ -18,6 +18,7 @@ import {
   type Egg,
   type Nest,
 } from '@/lib/egg';
+import { publishAnonymously } from '@/lib/anonPublish';
 import { NAMED_SITE_KIND } from '@/lib/nsite';
 import { useCurrentUser } from './useCurrentUser';
 import { useNostrPublish } from './useNostrPublish';
@@ -97,9 +98,11 @@ export function useClutch(owner: string | undefined, nestId: string | undefined)
   });
 }
 
-/** Throw an anonymous egg. No login: a throwaway key signs it. */
+/**
+ * Throw an anonymous egg. No login: a throwaway key signs it, and it travels
+ * over dedicated connections that never AUTH as the logged-in user.
+ */
 export function useThrowEgg(owner: string | undefined, nestId: string | undefined) {
-  const { nostr } = useNostr();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (content: string) => {
@@ -107,7 +110,7 @@ export function useThrowEgg(owner: string | undefined, nestId: string | undefine
       // Let the throw animation start before the (synchronous) PoW mining.
       await new Promise((resolve) => setTimeout(resolve, 50));
       const event = layAnonymousEgg({ owner, nestId, content });
-      await nostr.event(event, { signal: AbortSignal.timeout(8000) });
+      await publishAnonymously(event);
       return event;
     },
     onSuccess: () => {
