@@ -1,0 +1,9 @@
+{
+  "name": "Egg of Ostriches",
+  "short_name": "Ostrich Eggs",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8ecd0",
+  "theme_color": "#f0591b",
+  "icons": []
+}

@@ -1,0 +1,268 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-shell: var(--shell);
+  --color-speckle: var(--speckle);
+  --color-neck: var(--neck);
+
+  --font-sans: 'Hiragino Maru Gothic ProN', 'BIZ UDPGothic', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
+  --font-display: 'Bagel Fat One', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
+
+  --animate-wobble: wobble 1.6s ease-in-out infinite;
+  --animate-bob: bob 2.4s ease-in-out infinite;
+  --animate-throw: throw 0.9s cubic-bezier(0.3, 0, 0.6, 1) forwards;
+  --animate-land: land 0.6s ease-out;
+  --animate-hatch: hatch 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes wobble {
+    0%, 100% { transform: rotate(-4deg); }
+    50% { transform: rotate(4deg); }
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    30% { transform: translateY(-6px) rotate(-3deg); }
+    60% { transform: translateY(2px) rotate(2deg); }
+  }
+
+  /* Egg leaves the hand, arcs up, spins and drops into the nest. */
+  @keyframes throw {
+    0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+    45% { transform: translate(40vw, -30vh) rotate(360deg) scale(0.8); }
+    100% { transform: translate(70vw, 5vh) rotate(720deg) scale(0.4); opacity: 0; }
+  }
+
+  @keyframes land {
+    0% { transform: scale(1.3, 0.7); }
+    40% { transform: scale(0.9, 1.1); }
+    70% { transform: scale(1.05, 0.95); }
+    100% { transform: scale(1, 1); }
+  }
+
+  @keyframes hatch {
+    0% { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/* Container utility replacement for v4 (previously configured in tailwind.config) */
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+:root {
+  --radius: 1.25rem;
+
+  /* Savanna at noon: sand ground, cream eggshell, ostrich-black ink, flamingo-pink neck. */
+  --background: hsl(42 78% 90%);
+  --foreground: hsl(25 25% 12%);
+
+  --card: hsl(45 100% 97%);
+  --card-foreground: hsl(25 25% 12%);
+
+  --popover: hsl(45 100% 97%);
+  --popover-foreground: hsl(25 25% 12%);
+
+  --primary: hsl(18 90% 50%);
+  --primary-foreground: hsl(45 100% 98%);
+
+  --secondary: hsl(340 80% 88%);
+  --secondary-foreground: hsl(340 60% 25%);
+
+  --muted: hsl(40 55% 84%);
+  --muted-foreground: hsl(28 22% 32%);
+
+  --accent: hsl(84 45% 78%);
+  --accent-foreground: hsl(90 40% 18%);
+
+  --destructive: hsl(0 72% 45%);
+  --destructive-foreground: hsl(45 100% 98%);
+
+  --border: hsl(25 25% 12%);
+  --input: hsl(25 25% 12%);
+  --ring: hsl(18 90% 45%);
+
+  --chart-1: hsl(18 90% 50%);
+  --chart-2: hsl(340 75% 60%);
+  --chart-3: hsl(84 45% 45%);
+  --chart-4: hsl(43 90% 60%);
+  --chart-5: hsl(25 25% 12%);
+
+  --sidebar: hsl(45 100% 97%);
+  --sidebar-foreground: hsl(25 25% 12%);
+  --sidebar-primary: hsl(18 90% 50%);
+  --sidebar-primary-foreground: hsl(45 100% 98%);
+  --sidebar-accent: hsl(40 55% 84%);
+  --sidebar-accent-foreground: hsl(25 25% 12%);
+  --sidebar-border: hsl(25 25% 12%);
+  --sidebar-ring: hsl(18 90% 45%);
+
+  --shell: hsl(45 100% 96%);
+  --speckle: hsl(35 35% 70%);
+  --neck: hsl(340 75% 72%);
+}
+
+.dark {
+  /* Savanna at midnight. */
+  --background: hsl(240 30% 12%);
+  --foreground: hsl(45 80% 92%);
+
+  --card: hsl(240 25% 18%);
+  --card-foreground: hsl(45 80% 92%);
+
+  --popover: hsl(240 25% 18%);
+  --popover-foreground: hsl(45 80% 92%);
+
+  --primary: hsl(28 95% 58%);
+  --primary-foreground: hsl(240 30% 10%);
+
+  --secondary: hsl(340 45% 35%);
+  --secondary-foreground: hsl(340 80% 92%);
+
+  --muted: hsl(240 20% 24%);
+  --muted-foreground: hsl(45 30% 75%);
+
+  --accent: hsl(84 25% 30%);
+  --accent-foreground: hsl(84 60% 88%);
+
+  --destructive: hsl(0 70% 55%);
+  --destructive-foreground: hsl(0 0% 100%);
+
+  --border: hsl(45 80% 88%);
+  --input: hsl(45 80% 88%);
+  --ring: hsl(28 95% 58%);
+
+  --chart-1: hsl(28 95% 58%);
+  --chart-2: hsl(340 75% 65%);
+  --chart-3: hsl(84 45% 55%);
+  --chart-4: hsl(43 90% 60%);
+  --chart-5: hsl(45 80% 92%);
+
+  --sidebar: hsl(240 25% 18%);
+  --sidebar-foreground: hsl(45 80% 92%);
+  --sidebar-primary: hsl(28 95% 58%);
+  --sidebar-primary-foreground: hsl(240 30% 10%);
+  --sidebar-accent: hsl(240 20% 24%);
+  --sidebar-accent-foreground: hsl(45 80% 92%);
+  --sidebar-border: hsl(45 80% 88%);
+  --sidebar-ring: hsl(28 95% 58%);
+
+  --shell: hsl(45 90% 92%);
+  --speckle: hsl(35 30% 62%);
+  --neck: hsl(340 70% 70%);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentcolor);
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 1.0625rem;
+  }
+}
+
+/* Chunky "sticker" outline used all over the UI. */
+@utility sticker {
+  border: 3px solid var(--color-border);
+  box-shadow: 4px 4px 0 0 var(--color-border);
+}
+
+@utility sticker-sm {
+  border: 2px solid var(--color-border);
+  box-shadow: 3px 3px 0 0 var(--color-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
