@@ -75,8 +75,8 @@ export function ThrowEggForm({ owner, nestId }: { owner: string; nestId: string 
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-bold text-muted-foreground">
-              完全匿名：使い捨ての鍵で署名するので、誰が投げたかは誰にもわかりません。
-              <span className={remaining < 0 ? 'text-destructive' : ''}> 残り{remaining}字</span>
+              完全匿名・暗号化はされません
+              <span className={remaining < 0 ? 'text-destructive' : ''}> ／ 残り{remaining}字</span>
             </p>
             <Button
               type="submit"
@@ -97,9 +97,6 @@ export function ThrowEggForm({ owner, nestId }: { owner: string; nestId: string 
               ぽすっ。巣に着地しました！ダチョウが温めはじめています。
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
-            質問は暗号化されずNostrリレーに公開で保存されます。個人情報は書かないでね。
-          </p>
         </div>
       </div>
     </form>
