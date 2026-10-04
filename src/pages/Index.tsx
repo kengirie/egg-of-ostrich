@@ -27,7 +27,7 @@ const Index = () => {
       {/* hero */}
       <section className="relative grid items-center gap-8 pt-6 md:grid-cols-[1.2fr_1fr]">
         <div className="space-y-5">
-          <h1 className="text-5xl font-black leading-[1.1] sm:text-6xl">
+          <h1 className="text-4xl font-black leading-[1.15] sm:text-5xl">
             ダチョウの巣に、
             <br />
             <span className="relative inline-block -rotate-2 bg-primary px-2 text-primary-foreground">匿名の卵</span>
