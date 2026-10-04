@@ -9,7 +9,7 @@ import { ensureAppAssets, fetchSiteAssets, isSiteAssets, type SiteAssets } from 
 import { sha256Hex, uploadToServers } from '@/lib/blossomMulti';
 import { ANSWER_SITE_TAG, NEST_ID, answerSiteId, nestAddress, parseNest, type Egg } from '@/lib/egg';
 import { NAMED_SITE_KIND, buildNamedSiteManifest, type SitePath } from '@/lib/nsite';
-import { pickAnswerCardVariant, renderAnswerOgImage, type AnswerCardVariant } from '@/lib/ogImage';
+import { pickAnswerCardVariant, renderAnswerOgImage } from '@/lib/ogImage';
 import { LOOKUP_RELAYS, answerGatewayUrl, nestGatewayUrl } from '@/lib/siteConfig';
 import { isAnswerPageLive, renderAnswerAppHtml } from '@/lib/staticAnswer';
 import { useAppContext } from './useAppContext';
@@ -31,15 +31,12 @@ export type AnswerStep =
 export interface PublishAnswerResult {
   answerUrl: string;
   note: NostrEvent;
-  /** Whether the answer rolled the rare golden-egg card. */
-  variant: AnswerCardVariant;
 }
 
 interface PendingNote {
   egg: Egg;
   answer: string;
   answerUrl: string;
-  variant: AnswerCardVariant;
 }
 
 interface AnswerState {
@@ -150,7 +147,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
 
   /** Post the kind 1 note for an answer site that is (or is assumed to be) live. */
   const sendNote = useCallback(
-    async ({ egg, answer, answerUrl, variant }: PendingNote): Promise<PublishAnswerResult> => {
+    async ({ egg, answer, answerUrl }: PendingNote): Promise<PublishAnswerResult> => {
       if (!user) throw new Error('Only the nest owner can hatch eggs');
       const owner = user.pubkey;
       setState((prev) => ({ ...prev, step: 'posting' }));
@@ -166,7 +163,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
       queryClient.invalidateQueries({ queryKey: ['nostr', 'clutch', owner, nestId] });
       queryClient.invalidateQueries({ queryKey: ['nostr', 'recent-hatches'] });
 
-      const result = { answerUrl, note, variant };
+      const result = { answerUrl, note };
       setState((prev) => ({ ...prev, step: 'done', result, pending: null }));
       return result;
     },
@@ -205,9 +202,9 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
         // The question card. Its Blossom URL becomes og:image: immutable, and
         // independent of any gateway being up or holding a fresh manifest.
         // 1 in 10 answers rolls the rare golden-egg card.
-        const variant = pickAnswerCardVariant();
+        const { golden } = pickAnswerCardVariant();
         const og = await upload(
-          await renderAnswerOgImage({ question: egg.content, golden: variant.golden }),
+          await renderAnswerOgImage({ question: egg.content, golden }),
           `${siteId}.png`,
           'image/png',
         );
@@ -276,7 +273,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
         }
 
         setState((prev) => ({ ...prev, step: 'waiting' }));
-        const pending: PendingNote = { egg, answer, answerUrl, variant };
+        const pending: PendingNote = { egg, answer, answerUrl };
         if (!(await waitForAnswerPage(answerUrl, egg.id, LIVE_TIMEOUT_MS))) {
           setState((prev) => ({ ...prev, step: 'stalled', pending }));
           return null;
