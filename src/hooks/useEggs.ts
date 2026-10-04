@@ -53,9 +53,42 @@ export function useNest(owner: string | undefined, nestId: string | undefined) {
 }
 
 /**
- * Every egg in a nest with its hatch. One round-trip: all kind 1111s under the
- * nest's `A` root, the owner's kind 1 answer notes pointing at the nest, and
- * the owner's cracked list (both author-filtered).
+ * The owner's NIP-78 cracked (hidden) list. Queried on its own: Ditto-based
+ * relays only serve kind 30078 to its authenticated author and CLOSE the whole
+ * REQ otherwise, which used to wipe out the eggs fetched alongside it. Any
+ * failure here just means "nothing hidden".
+ */
+async function fetchCrackedIds(
+  nostr: ReturnType<typeof useNostr>['nostr'],
+  owner: string,
+  nestId: string,
+  signal: AbortSignal,
+): Promise<Set<string>> {
+  try {
+    const events = await nostr.query(
+      [{ kinds: [APP_DATA_KIND], authors: [owner], '#d': [crackedListId(nestId)], limit: 1 }],
+      { signal: timeout(signal) },
+    );
+    return parseCrackedIds(newest(events.filter((e) => e.kind === APP_DATA_KIND && e.pubkey === owner)));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Egg ids the owner hid from the nest. */
+export function useCrackedIds(owner: string | undefined, nestId: string | undefined) {
+  const { nostr } = useNostr();
+  return useQuery<Set<string>>({
+    queryKey: ['nostr', 'cracked', owner, nestId],
+    enabled: Boolean(owner && nestId),
+    queryFn: ({ signal }) => fetchCrackedIds(nostr, owner!, nestId!, signal),
+  });
+}
+
+/**
+ * Every egg in a nest with its hatch: all kind 1111s under the nest's `A`
+ * root plus the owner's kind 1 answer notes pointing at the nest, and —
+ * separately, see `fetchCrackedIds` — the owner's cracked list.
  */
 export function useClutch(owner: string | undefined, nestId: string | undefined) {
   const { nostr } = useNostr();
@@ -64,15 +97,16 @@ export function useClutch(owner: string | undefined, nestId: string | undefined)
     enabled: Boolean(owner && nestId),
     refetchInterval: 30_000,
     queryFn: async ({ signal }) => {
-      const events = await nostr.query(
-        [
-          { kinds: [COMMENT_KIND], '#A': [nestAddress(owner!, nestId!)], limit: 500 },
-          { kinds: [ANSWER_KIND], authors: [owner!], '#a': [nestAddress(owner!, nestId!)], limit: 500 },
-          { kinds: [APP_DATA_KIND], authors: [owner!], '#d': [crackedListId(nestId!)], limit: 1 },
-        ],
-        { signal: timeout(signal) },
-      );
-      const cracked = parseCrackedIds(newest(events.filter((e) => e.kind === APP_DATA_KIND && e.pubkey === owner)));
+      const [events, cracked] = await Promise.all([
+        nostr.query(
+          [
+            { kinds: [COMMENT_KIND], '#A': [nestAddress(owner!, nestId!)], limit: 500 },
+            { kinds: [ANSWER_KIND], authors: [owner!], '#a': [nestAddress(owner!, nestId!)], limit: 500 },
+          ],
+          { signal: timeout(signal) },
+        ),
+        fetchCrackedIds(nostr, owner!, nestId!, signal),
+      ]);
       return sortClutch(events, owner!, nestId!, { cracked });
     },
   });
@@ -120,6 +154,7 @@ export function useCrackEgg(nestId: string | undefined) {
       queryClient.setQueryData<Egg[]>(['nostr', 'clutch', user?.pubkey, nestId], (eggs) =>
         eggs?.filter((e) => e.id !== eggId),
       );
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'cracked', user?.pubkey, nestId] });
     },
   });
 }

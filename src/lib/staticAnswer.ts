@@ -13,6 +13,7 @@ import {
   FAVICON_HREF,
   NEST_SITE_CSP,
 } from './staticNest';
+import type { NostrEvent } from '@nostrify/nostrify';
 
 /** Max characters of the answer quoted in og:description before truncating. */
 const DESCRIPTION_MAX = 200;
@@ -37,6 +38,13 @@ export interface AnswerAppHtmlInput {
   npub: string;
   /** The answered egg's id (64 hex). */
   eggId: string;
+  /**
+   * The signed egg (kind 1111) and answer note (kind 1), baked into the page so
+   * the answer shows even when relays are slow or don't have them (Rostrum
+   * bakes its deck event the same way).
+   */
+  eggEvent?: NostrEvent;
+  hatchEvent?: NostrEvent;
   /** App entry module scripts from site-assets.json. */
   scripts: string[];
   /** App entry stylesheets from site-assets.json. */
@@ -65,6 +73,14 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
 
   if (!/^npub1[a-z0-9]+$/.test(input.npub)) throw new Error(`Refusing bad npub: ${input.npub}`);
   if (!/^[0-9a-f]{64}$/.test(input.eggId)) throw new Error(`Refusing bad egg id: ${input.eggId}`);
+
+  // Non-executable data in attributes — safe under `script-src 'self'`.
+  const bakedEvents = [
+    input.eggEvent && `<meta name="egg:event" content="${escapeHtml(JSON.stringify(input.eggEvent))}">`,
+    input.hatchEvent && `<meta name="egg:hatch" content="${escapeHtml(JSON.stringify(input.hatchEvent))}">`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const styleTags = styles
     .map((href) => `<link rel="stylesheet" crossorigin href="${escapeHtml(href)}">`)
@@ -99,6 +115,8 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
 <meta name="twitter:image" content="${ogImage}">
 <meta name="egg:npub" content="${escapeHtml(input.npub)}">
 <meta name="egg:answer" content="${escapeHtml(input.eggId)}">
+<meta name="egg:nest-title" content="${nestTitle}">
+${bakedEvents}
 ${styleTags}
 ${scriptTags}
 </head>

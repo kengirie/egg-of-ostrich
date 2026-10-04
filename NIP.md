@@ -71,6 +71,7 @@ Each answer is published as its **own** NIP-5A named site by the owner, before t
 | URL | `https://<pubkeyB36>q<12 hex>.<gateway>/` — this is the answer link |
 | tags | standard NIP-5A tags plus `["t", "egg-of-ostriches-answer"]` and `["a", "35128:<owner>:nest"]` |
 | paths | `/index.html` and `/404.html` (the app HTML with OG/Twitter meta for this answer, `<meta name="egg:npub">` and `<meta name="egg:answer" content="<egg id>">`, so it boots straight into the answer), `/og.png`, `/site-assets.json`, and the app's `/assets/*` bundles |
+| baked events | `<meta name="egg:event">` (the signed egg JSON), `<meta name="egg:hatch">` (the signed answer note JSON) and `<meta name="egg:nest-title">`, HTML-escaped. Clients re-verify the signatures and the egg/answer pairing, show them immediately, and keep them when relays are slow or missing the events (a newer relay answer wins; a cracked egg is still hidden). The answer note is signed before the site is built and published after it. |
 
 `og:image` / `twitter:image` point at the **Blossom blob URL** of the question card (also listed in the manifest as `/og.png`), so the card does not depend on any gateway being up or fresh.
 
@@ -83,3 +84,5 @@ Earlier versions posted answers as kind 1111 replies, or baked answer pages into
 ## Cracked (hidden) eggs — kind `30078`
 
 The owner hides eggs with a [NIP-78](https://github.com/nostr-protocol/nips/blob/master/78.md) app-data event, `d` = `egg-of-ostriches/cracked/nest`, listing hidden egg ids in `e` tags. Clients query it by the owner's pubkey only and hide the listed eggs.
+
+Query it in its **own** REQ: some relays (e.g. Ditto) only serve kind 30078 to its authenticated author and close the whole REQ otherwise, which would also drop the eggs requested alongside it.

@@ -64,6 +64,8 @@ export interface Egg {
   createdAt: number;
   /** The owner's latest answer, if the egg has hatched. */
   hatch?: Hatch;
+  /** The signed kind 1111 event (baked into answer sites). */
+  event: NostrEvent;
 }
 
 export function nestAddress(pubkey: string, id: string): string {
@@ -222,6 +224,7 @@ export function sortClutch(
       pubkey: event.pubkey,
       content: content.slice(0, EGG_MAX_LENGTH),
       createdAt: event.created_at,
+      event,
     });
   }
 

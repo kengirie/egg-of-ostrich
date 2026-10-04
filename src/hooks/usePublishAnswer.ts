@@ -14,7 +14,7 @@ import { LOOKUP_RELAYS, answerGatewayUrl, nestGatewayUrl } from '@/lib/siteConfi
 import { isAnswerPageLive, renderAnswerAppHtml } from '@/lib/staticAnswer';
 import { useAppContext } from './useAppContext';
 import { useCurrentUser } from './useCurrentUser';
-import { useNostrPublish } from './useNostrPublish';
+import { CLIENT_NAME, useNostrPublish } from './useNostrPublish';
 
 export type AnswerStep =
   | 'idle'
@@ -37,6 +37,8 @@ interface PendingNote {
   egg: Egg;
   answer: string;
   answerUrl: string;
+  /** Signed before the answer site is built (it's baked in), published after. */
+  note: NostrEvent;
 }
 
 interface AnswerState {
@@ -147,13 +149,11 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
 
   /** Post the kind 1 note for an answer site that is (or is assumed to be) live. */
   const sendNote = useCallback(
-    async ({ egg, answer, answerUrl }: PendingNote): Promise<PublishAnswerResult> => {
+    async ({ egg, answer, answerUrl, note }: PendingNote): Promise<PublishAnswerResult> => {
       if (!user) throw new Error('Only the nest owner can hatch eggs');
       const owner = user.pubkey;
       setState((prev) => ({ ...prev, step: 'posting' }));
-      const note = await publishEvent(
-        buildAnswerNoteTemplate({ owner, nestId, egg: { id: egg.id, pubkey: egg.pubkey }, content: answer, answerUrl }),
-      );
+      await nostr.event(note, { signal: AbortSignal.timeout(8000) });
 
       queryClient.setQueryData<Egg[]>(['nostr', 'clutch', owner, nestId], (eggs) =>
         eggs?.map((e) =>
@@ -167,7 +167,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
       setState((prev) => ({ ...prev, step: 'done', result, pending: null }));
       return result;
     },
-    [user, nestId, publishEvent, queryClient],
+    [user, nestId, nostr, queryClient],
   );
 
   const publish = useCallback(
@@ -226,6 +226,21 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
           assetBase: siteAssets.assetBase,
         });
 
+        // Sign the answer note now so the answer site can bake it in; it is
+        // only published once the gateway serves that site.
+        const noteTemplate = buildAnswerNoteTemplate({
+          owner,
+          nestId,
+          egg: { id: egg.id, pubkey: egg.pubkey },
+          content: answer,
+          answerUrl,
+        });
+        const note = await user.signer.signEvent({
+          ...noteTemplate,
+          tags: [...noteTemplate.tags, ['client', CLIENT_NAME]],
+          created_at: Math.floor(Date.now() / 1000),
+        });
+
         const html = renderAnswerAppHtml({
           ownerName,
           nestTitle: nest.title,
@@ -235,6 +250,8 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
           ogImageUrl: og.url,
           npub: nip19.npubEncode(owner),
           eggId: egg.id,
+          eggEvent: egg.event,
+          hatchEvent: note,
           scripts: siteAssets.scripts,
           styles: siteAssets.styles,
         });
@@ -273,7 +290,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
         }
 
         setState((prev) => ({ ...prev, step: 'waiting' }));
-        const pending: PendingNote = { egg, answer, answerUrl };
+        const pending: PendingNote = { egg, answer, answerUrl, note };
         if (!(await waitForAnswerPage(answerUrl, egg.id, LIVE_TIMEOUT_MS))) {
           setState((prev) => ({ ...prev, step: 'stalled', pending }));
           return null;

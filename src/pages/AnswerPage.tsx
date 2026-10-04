@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { nip19 } from 'nostr-tools';
@@ -9,8 +9,9 @@ import { Layout } from '@/components/egg/Layout';
 import { Ostrich } from '@/components/egg/Ostrich';
 import { ThrowEggForm } from '@/components/egg/ThrowEggForm';
 import { useAuthor } from '@/hooks/useAuthor';
-import { useClutch, useNest } from '@/hooks/useEggs';
-import { NEST_ID, decodeNpub, isAnswerSiteId } from '@/lib/egg';
+import { useClutch, useCrackedIds, useNest } from '@/hooks/useEggs';
+import { readBakedAnswer } from '@/lib/bakedAnswer';
+import { NEST_ID, decodeNpub, isAnswerSiteId, type Egg } from '@/lib/egg';
 import { sanitizeUrl } from '@/lib/sanitizeUrl';
 import { getSiteTarget, nestGatewayUrl } from '@/lib/siteConfig';
 import { timeAgo } from '@/lib/time';
@@ -50,15 +51,28 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
   const meta = author.data?.metadata;
   const ownerName = meta?.display_name || meta?.name || nip19.npubEncode(owner).slice(0, 12) + '…';
   const avatar = sanitizeUrl(meta?.picture);
-  const nestTitle = nest.data?.title ?? `${ownerName}の巣`;
-  const egg = clutch.data?.find((e) => e.id.startsWith(prefix));
+  const cracked = useCrackedIds(owner, nestId);
+  // On an answer site the egg + answer are baked into the page (Rostrum-style):
+  // show them at once, and keep them if relays are slow or don't have them.
+  const baked = useMemo(() => (prefix.length === 64 ? readBakedAnswer(owner, prefix) : null), [owner, prefix]);
+  const nestTitle = nest.data?.title ?? baked?.nestTitle ?? `${ownerName}の巣`;
+  const egg = useMemo<Egg | undefined>(() => {
+    const fromRelays = clutch.data?.find((e) => e.id.startsWith(prefix));
+    const hidden = cracked.data?.has(fromRelays?.id ?? baked?.egg.id ?? '');
+    if (hidden) return undefined;
+    if (!fromRelays) return baked?.egg;
+    // Relays may lag behind the baked answer (or carry a newer re-answer).
+    const hatches = [fromRelays.hatch, baked?.egg.hatch].filter((h) => h !== undefined);
+    const hatch = hatches.sort((a, b) => b.createdAt - a.createdAt)[0];
+    return { ...fromRelays, hatch };
+  }, [clutch.data, cracked.data, baked, prefix]);
 
   useSeoMeta({
     title: egg ? `${egg.content} | Egg of Ostriches` : `${nestTitle} | Egg of Ostriches`,
     description: egg?.hatch ? `${ownerName}さんの回答「${egg.hatch.content}」` : `${ownerName}の巣に届いた匿名の卵（質問）。`,
   });
 
-  if (nest.isLoading || clutch.isLoading) {
+  if (!baked && (nest.isLoading || clutch.isLoading)) {
     return (
       <Layout>
         <div className="space-y-4 pt-6">
@@ -70,18 +84,18 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
     );
   }
 
-  if (!nest.data || !egg) {
+  if ((!nest.data && !baked) || !egg) {
     return (
       <Layout>
         <div className="sticker mx-auto mt-10 max-w-lg rounded-3xl bg-card p-8 text-center">
           <Ostrich className="mx-auto h-40 w-36" mood="shock" />
-          <h1 className="mt-4 text-2xl font-extrabold">{nest.data ? '卵が見つからない！' : '質問箱が見つからない！'}</h1>
+          <h1 className="mt-4 text-2xl font-extrabold">{nest.data || baked ? '卵が見つからない！' : '質問箱が見つからない！'}</h1>
           <p className="mt-2 text-muted-foreground">
-            {nest.data
+            {nest.data || baked
               ? 'この卵は割られてしまったか、まだリレーに届いていないようです。'
               : 'ダチョウが砂に頭を突っこんで探していますが、この質問箱はまだリレーに届いていないようです。少し待ってから再読み込みしてみてください。'}
           </p>
-          {nest.data ? (
+          {nest.data || baked ? (
             <NestLink owner={owner} npub={npub} className="mt-6 inline-block font-extrabold text-primary underline">
               {nestTitle} へ行く →
             </NestLink>
