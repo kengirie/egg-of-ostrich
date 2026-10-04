@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ostrichTrack, pickAnswerCardVariant, wrapText } from './ogImage';
+import { pickAnswerCardVariant, wrapText } from './ogImage';
 
 // jsdom has no canvas: every character is 10px wide, "…" too.
 const measure = (s: string) => Array.from(s).length * 10;
@@ -46,44 +46,16 @@ describe('wrapText', () => {
 });
 
 describe('pickAnswerCardVariant', () => {
-  it('rolls golden and animated independently at 1 in 10', () => {
-    const seq = (...values: number[]) => () => values.shift() ?? 1;
-    expect(pickAnswerCardVariant(seq(0.5, 0.5))).toEqual({ golden: false, animated: false });
-    expect(pickAnswerCardVariant(seq(0.05, 0.5))).toEqual({ golden: true, animated: false });
-    expect(pickAnswerCardVariant(seq(0.5, 0.09))).toEqual({ golden: false, animated: true });
-    expect(pickAnswerCardVariant(seq(0.01, 0.01))).toEqual({ golden: true, animated: true });
-    expect(pickAnswerCardVariant(seq(0.1, 0.1))).toEqual({ golden: false, animated: false });
+  it('rolls the golden egg below 0.1', () => {
+    expect(pickAnswerCardVariant(() => 0.5)).toEqual({ golden: false });
+    expect(pickAnswerCardVariant(() => 0.05)).toEqual({ golden: true });
+    expect(pickAnswerCardVariant(() => 0.1)).toEqual({ golden: false });
   });
 
-  it('hits roughly 10% each over many rolls', () => {
+  it('hits roughly 10% over many rolls', () => {
     let golden = 0;
-    let animated = 0;
-    for (let i = 0; i < 20000; i++) {
-      const v = pickAnswerCardVariant();
-      if (v.golden) golden++;
-      if (v.animated) animated++;
-    }
+    for (let i = 0; i < 20000; i++) if (pickAnswerCardVariant().golden) golden++;
     expect(golden / 20000).toBeGreaterThan(0.08);
     expect(golden / 20000).toBeLessThan(0.12);
-    expect(animated / 20000).toBeGreaterThan(0.08);
-    expect(animated / 20000).toBeLessThan(0.12);
-  });
-});
-
-describe('ostrichTrack', () => {
-  it('runs right along the bubble, back left along the ground, and closes the loop', () => {
-    const points = Array.from({ length: 200 }, (_, i) => ostrichTrack(i / 200));
-    expect(points[0].facing).toBe(1);
-    expect(points.some((p) => p.facing === -1)).toBe(true);
-    // Always inside the 1200x630 card.
-    for (const p of points) {
-      expect(p.x).toBeGreaterThanOrEqual(0);
-      expect(p.x).toBeLessThanOrEqual(1200);
-      expect(p.y).toBeGreaterThan(0);
-      expect(p.y).toBeLessThanOrEqual(630);
-    }
-    const start = ostrichTrack(0);
-    const end = ostrichTrack(0.99999);
-    expect(Math.hypot(start.x - end.x, start.y - end.y)).toBeLessThan(2);
   });
 });

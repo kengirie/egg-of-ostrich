@@ -9,7 +9,7 @@ import { ensureAppAssets, fetchSiteAssets, isSiteAssets, type SiteAssets } from 
 import { sha256Hex, uploadToServers } from '@/lib/blossomMulti';
 import { ANSWER_SITE_TAG, NEST_ID, answerSiteId, nestAddress, parseNest, type Egg } from '@/lib/egg';
 import { NAMED_SITE_KIND, buildNamedSiteManifest, type SitePath } from '@/lib/nsite';
-import { pickAnswerCardVariant, renderAnswerOgGif, renderAnswerOgImage, type AnswerCardVariant } from '@/lib/ogImage';
+import { pickAnswerCardVariant, renderAnswerOgImage, type AnswerCardVariant } from '@/lib/ogImage';
 import { LOOKUP_RELAYS, answerGatewayUrl, nestGatewayUrl } from '@/lib/siteConfig';
 import { isAnswerPageLive, renderAnswerAppHtml } from '@/lib/staticAnswer';
 import { useAppContext } from './useAppContext';
@@ -31,7 +31,7 @@ export type AnswerStep =
 export interface PublishAnswerResult {
   answerUrl: string;
   note: NostrEvent;
-  /** Which rare card the answer rolled (golden eggs / running-ostrich GIF). */
+  /** Whether the answer rolled the rare golden-egg card. */
   variant: AnswerCardVariant;
 }
 
@@ -204,16 +204,12 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
 
         // The question card. Its Blossom URL becomes og:image: immutable, and
         // independent of any gateway being up or holding a fresh manifest.
-        // Each answer independently rolls the rare cards: golden eggs (1/10)
-        // and an animated GIF with an ostrich lapping the question (1/10).
+        // 1 in 10 answers rolls the rare golden-egg card.
         const variant = pickAnswerCardVariant();
-        const ogType = variant.animated ? 'image/gif' : 'image/png';
-        const ogPath = variant.animated ? '/og.gif' : '/og.png';
-        const card = { question: egg.content, golden: variant.golden };
         const og = await upload(
-          variant.animated ? await renderAnswerOgGif(card) : await renderAnswerOgImage(card),
-          `${siteId}${variant.animated ? '.gif' : '.png'}`,
-          ogType,
+          await renderAnswerOgImage({ question: egg.content, golden: variant.golden }),
+          `${siteId}.png`,
+          'image/png',
         );
 
         setState((prev) => ({ ...prev, step: 'uploading' }));
@@ -240,7 +236,6 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
           answer,
           canonicalUrl: answerUrl,
           ogImageUrl: og.url,
-          ogImageType: ogType,
           npub: nip19.npubEncode(owner),
           eggId: egg.id,
           scripts: siteAssets.scripts,
@@ -261,7 +256,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
           { path: '/index.html', sha256: page.sha256 },
           // Unknown paths ride the gateway's /404.html fallback (see usePublishNest).
           { path: '/404.html', sha256: page.sha256 },
-          { path: ogPath, sha256: og.sha256 },
+          { path: '/og.png', sha256: og.sha256 },
           { path: '/site-assets.json', sha256: assetIndex.sha256 },
           ...siteAssets.assets.map((asset) => ({ path: asset.path, sha256: asset.sha256 })),
         ];

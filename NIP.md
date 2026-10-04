@@ -74,7 +74,7 @@ Each answer is published as its **own** NIP-5A named site by the owner, before t
 
 `og:image` / `twitter:image` point at the **Blossom blob URL** of the question card (also listed in the manifest as `/og.png`), so the card does not depend on any gateway being up or fresh.
 
-Each answer independently rolls two rare cards: **golden eggs** (1 in 10) and an **animated GIF** in which an ostrich runs laps around the question (1 in 10, 800×420, listed as `/og.gif` with `og:image:type` `image/gif`). Both can land on the same answer.
+1 in 10 answers rolls a rare card with **golden eggs**.
 
 Because the answer site is a brand-new named site, gateways hold no stale manifest for it. The owner's client still waits until the gateway actually serves the page (it contains the `egg:answer` meta) before publishing the note, because clients unfurl and cache a link as soon as they see it. If the gateway is slow, the note is held and can be posted later.
 

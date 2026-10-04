@@ -145,9 +145,8 @@ export function OwnerEggCard({
   const onPosted = ({ variant }: PublishAnswerResult) => {
     setOpen(false);
     onHatched?.();
-    const rare = [variant.golden && '金色の卵', variant.animated && 'ダチョウが走り回るGIF'].filter(Boolean).join('＋');
     toast({
-      title: rare ? `レア！${rare}のカードが出ました` : 'ピヨッ！卵が孵りました',
+      title: variant.golden ? 'レア！金色の卵のカードが出ました' : 'ピヨッ！卵が孵りました',
       description: '回答リンクつきの kind 1 ノートをタイムラインに投稿しました。',
     });
   };
