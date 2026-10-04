@@ -276,7 +276,7 @@ export function OwnerEggCard({
               disabled={!answer.trim() || hatch.isPending || hatch.step === 'stalled'}
               className="sticker-sm rounded-full font-extrabold"
             >
-              {hatch.isPending && <Loader2 className="size-4 animate-spin" />} 孵化させる
+              {hatch.isPending && <Loader2 className="size-4 animate-spin" />} Nostrに投稿する
             </Button>
           </div>
         </form>

@@ -26,7 +26,7 @@ export function NestNoteForm({ nestUrl }: { nestUrl: string }) {
       <div className="flex justify-end">
         <Button type="button" onClick={onPost} disabled={isPending || isSuccess} className="sticker-sm rounded-full font-extrabold">
           {isPending ? <Loader2 className="size-4 animate-spin" /> : isSuccess ? <Check className="size-4" /> : null}
-          {isSuccess ? '投稿しました' : 'kind 1 で投稿する'}
+          {isSuccess ? '投稿しました' : 'Nostrに投稿する'}
         </Button>
       </div>
     </div>
