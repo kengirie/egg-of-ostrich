@@ -5,8 +5,8 @@ const BASE = {
   title: 'ダチョウの巣',
   description: '',
   ownerName: 'ostrich',
-  canonicalUrl: 'https://abcask.nwb.tf/',
-  ogImageUrl: 'https://abcask.nwb.tf/og.png',
+  canonicalUrl: 'https://abcnest.nsite.lol/',
+  ogImageUrl: 'https://abcnest.nsite.lol/og.png',
   npub: 'npub1abc',
   nestId: 'ask',
   scripts: ['/assets/index-abc.js'],
@@ -16,7 +16,7 @@ const BASE = {
 describe('renderNestAppHtml', () => {
   it('bakes OG meta, nest identity and app entry points', () => {
     const html = renderNestAppHtml(BASE);
-    expect(html).toContain('<meta property="og:image" content="https://abcask.nwb.tf/og.png">');
+    expect(html).toContain('<meta property="og:image" content="https://abcnest.nsite.lol/og.png">');
     expect(html).toContain('<meta name="egg:npub" content="npub1abc">');
     expect(html).toContain('<meta name="egg:id" content="ask">');
     expect(html).toContain('<script type="module" crossorigin src="/assets/index-abc.js"></script>');

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { nip19 } from 'nostr-tools';
@@ -9,29 +10,40 @@ import { Ostrich } from '@/components/egg/Ostrich';
 import { ThrowEggForm } from '@/components/egg/ThrowEggForm';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useClutch, useNest } from '@/hooks/useEggs';
-import { decodeNpub, isValidNestId } from '@/lib/egg';
+import { NEST_ID, decodeNpub, isAnswerSiteId } from '@/lib/egg';
 import { sanitizeUrl } from '@/lib/sanitizeUrl';
-import { getNestSiteTarget, isAnswerSlug } from '@/lib/siteConfig';
+import { getSiteTarget, nestGatewayUrl } from '@/lib/siteConfig';
 import { timeAgo } from '@/lib/time';
 import NotFound from './NotFound';
 
 /**
  * One answered egg: the question big, the owner's answer, and a box to throw
- * your own egg. Served at `/a/<slug>.html` on a nest's nsite (the page the kind
- * 1 answer note links to) and at `/<npub>/<nest-id>/a/<slug>` in the app.
+ * your own egg. Served at "/" on the answer's own nsite (the link in the kind 1
+ * answer note) and at `/<npub>/q<12 hex>` in the app.
  */
-export default function AnswerPage(props: { npub?: string; nestId?: string; slug?: string }) {
-  const params = useParams<{ npub: string; nestId: string; slug: string }>();
+export default function AnswerPage(props: { npub?: string; eggId?: string }) {
+  const params = useParams<{ npub: string; answerId: string }>();
   const npub = props.npub ?? params.npub;
-  const nestId = props.nestId ?? params.nestId;
-  const slug = props.slug ?? params.slug;
   const owner = decodeNpub(npub);
+  // The full egg id on an answer site; the 12-hex prefix from an in-app URL.
+  const prefix = props.eggId ?? (params.answerId && isAnswerSiteId(params.answerId) ? params.answerId.slice(1) : undefined);
 
-  if (!owner || !npub || !nestId || !isValidNestId(nestId) || !slug || !isAnswerSlug(slug)) return <NotFound />;
-  return <Answer owner={owner} npub={npub} nestId={nestId} slug={slug} />;
+  if (!owner || !npub || !prefix || !/^[0-9a-f]{12,64}$/.test(prefix)) return <NotFound />;
+  return <Answer owner={owner} npub={npub} prefix={prefix} />;
 }
 
-function Answer({ owner, npub, nestId, slug }: { owner: string; npub: string; nestId: string; slug: string }) {
+/** Link to the owner's nest: same-origin route in the app/nest site, the nest's nsite from an answer site. */
+function NestLink({ owner, npub, className, children }: { owner: string; npub: string; className?: string; children: ReactNode }) {
+  const target = getSiteTarget();
+  if (target?.kind === 'answer') {
+    return <a href={nestGatewayUrl(owner)} className={className}>{children}</a>;
+  }
+  const to = target?.kind === 'nest' && target.npub === npub ? '/' : `/${npub}`;
+  return <Link to={to} className={className}>{children}</Link>;
+}
+
+function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: string }) {
+  const nestId = NEST_ID;
   const nest = useNest(owner, nestId);
   const clutch = useClutch(owner, nestId);
   const author = useAuthor(owner);
@@ -39,11 +51,7 @@ function Answer({ owner, npub, nestId, slug }: { owner: string; npub: string; ne
   const ownerName = meta?.display_name || meta?.name || nip19.npubEncode(owner).slice(0, 12) + '…';
   const avatar = sanitizeUrl(meta?.picture);
   const nestTitle = nest.data?.title ?? `${ownerName}の巣`;
-  const egg = clutch.data?.find((e) => e.id.startsWith(slug));
-
-  // On the nest's own site the nest lives at "/".
-  const target = getNestSiteTarget();
-  const nestPath = target && target.npub === npub && target.nestId === nestId ? '/' : `/${npub}/${nestId}`;
+  const egg = clutch.data?.find((e) => e.id.startsWith(prefix));
 
   useSeoMeta({
     title: `${ownerName}の巣に届いた卵 | ${nestTitle} | Egg of Ostriches`,
@@ -67,19 +75,19 @@ function Answer({ owner, npub, nestId, slug }: { owner: string; npub: string; ne
       <Layout>
         <div className="sticker mx-auto mt-10 max-w-lg rounded-3xl bg-card p-8 text-center">
           <Ostrich className="mx-auto h-40 w-36" mood="shock" />
-          <h1 className="mt-4 text-2xl font-extrabold">{nest.data ? '卵が見つからない！' : '巣が見つからない！'}</h1>
+          <h1 className="mt-4 text-2xl font-extrabold">{nest.data ? '卵が見つからない！' : '質問箱が見つからない！'}</h1>
           <p className="mt-2 text-muted-foreground">
             {nest.data
               ? 'この卵は割られてしまったか、まだリレーに届いていないようです。'
-              : 'ダチョウが砂に頭を突っこんで探していますが、この巣はまだリレーに届いていないようです。少し待ってから再読み込みしてみてください。'}
+              : 'ダチョウが砂に頭を突っこんで探していますが、この質問箱はまだリレーに届いていないようです。少し待ってから再読み込みしてみてください。'}
           </p>
           {nest.data ? (
-            <Link to={nestPath} className="mt-6 inline-block font-extrabold text-primary underline">
+            <NestLink owner={owner} npub={npub} className="mt-6 inline-block font-extrabold text-primary underline">
               {nestTitle} へ行く →
-            </Link>
+            </NestLink>
           ) : (
             <Link to="/new" className="mt-6 inline-block font-extrabold text-primary underline">
-              自分の巣をつくる →
+              自分の質問箱を開く →
             </Link>
           )}
         </div>
@@ -90,7 +98,11 @@ function Answer({ owner, npub, nestId, slug }: { owner: string; npub: string; ne
   return (
     <Layout>
       <section className="mt-4 space-y-6">
-        <Link to={nestPath} className="inline-flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring">
+        <NestLink
+          owner={owner}
+          npub={npub}
+          className="inline-flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring"
+        >
           {avatar ? (
             <img src={avatar} alt="" className="sticker-sm size-12 rounded-full bg-muted object-cover" />
           ) : (
@@ -100,7 +112,7 @@ function Answer({ owner, npub, nestId, slug }: { owner: string; npub: string; ne
             <span className="block text-lg font-extrabold hover:underline">{ownerName} の巣</span>
             <span className="block truncate text-sm font-bold text-muted-foreground">{nestTitle}</span>
           </span>
-        </Link>
+        </NestLink>
 
         {/* the question, egg style */}
         <article className="sticker relative -rotate-1 rounded-[3rem] bg-shell px-6 py-8 sm:px-10">
@@ -146,9 +158,9 @@ function Answer({ owner, npub, nestId, slug }: { owner: string; npub: string; ne
         <h2 className="text-2xl font-black">あなたも卵を投げてみる？</h2>
         <ThrowEggForm owner={owner} nestId={nestId} />
         <p className="text-center font-extrabold">
-          <Link to={nestPath} className="text-primary underline underline-offset-4">
+          <NestLink owner={owner} npub={npub} className="text-primary underline underline-offset-4">
             🪺 {nestTitle} のほかの卵を見る
-          </Link>
+          </NestLink>
         </p>
       </section>
     </Layout>

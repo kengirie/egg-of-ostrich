@@ -1,62 +1,40 @@
 import { pubkeyToBase36 } from './nsite';
+import { NEST_ID, answerSiteId } from './egg';
 
 /**
- * The nsite gateway that serves published nests (question boxes). A dumb pipe:
- * any NIP-5A-compatible gateway can be swapped in here without republishing —
- * the manifests and blobs live on relays and Blossom servers.
+ * The nsite gateway used for every link we hand out (nest and answer sites).
+ * nwb.tf caches manifests aggressively and has had outages, so the canonical
+ * gateway is nsite.lol; the manifests and blobs live on relays and Blossom, so
+ * any NIP-5A gateway can still open the same sites.
  */
-export const GATEWAY_DOMAIN = 'nwb.tf';
+export const GATEWAY_DOMAIN = 'nsite.lol';
 
-/** Gateways a nest link may be opened on; the first one is canonical. */
-export const APP_GATEWAYS = ['nwb.tf', 'nsite.lol'];
+/** Gateways a site may be opened on; the first one is canonical. */
+export const APP_GATEWAYS = ['nsite.lol', 'nwb.tf'];
 
 /** Extra relays the gateway ecosystem uses to look up user data (10063 etc.). */
 export const LOOKUP_RELAYS = ['wss://user.kindpag.es/', 'wss://purplepag.es/'];
 
-/**
- * Canonical NIP-5A named-site URL of a nest: `<pubkeyB36><d>.<gateway>`. The
- * nest IS the named site (kind 35128); eggs are kind 1111 comments on it.
- */
-export function nestGatewayUrl(pubkeyHex: string, nestId: string, gateway = GATEWAY_DOMAIN): string {
-  return `https://${pubkeyToBase36(pubkeyHex)}${nestId}.${gateway}/`;
+/** NIP-5A named-site URL: `https://<pubkeyB36><d>.<gateway>/`. */
+export function namedSiteUrl(pubkeyHex: string, identifier: string, gateway = GATEWAY_DOMAIN): string {
+  return `https://${pubkeyToBase36(pubkeyHex)}${identifier}.${gateway}/`;
 }
 
-/** An answer page's slug: the first 16 hex chars of the answered egg's id. */
-const ANSWER_SLUG_RE = /^[0-9a-f]{16}$/;
-
-export function isAnswerSlug(value: string): boolean {
-  return ANSWER_SLUG_RE.test(value);
+/** The user's nest (question box) link. */
+export function nestGatewayUrl(pubkeyHex: string, gateway = GATEWAY_DOMAIN): string {
+  return namedSiteUrl(pubkeyHex, NEST_ID, gateway);
 }
 
-export function answerSlug(eggId: string): string {
-  if (!/^[0-9a-f]{64}$/.test(eggId)) throw new Error(`Refusing bad egg id: ${eggId}`);
-  return eggId.slice(0, 16);
-}
-
-/**
- * Where an answer page lives inside the nest's nsite. The `.html` extension is
- * required: gateways serve extensionless paths with the wrong MIME type.
- */
-export function answerPaths(slug: string): { html: string; png: string } {
-  if (!isAnswerSlug(slug)) throw new Error(`Refusing bad answer slug: ${slug}`);
-  return { html: `/a/${slug}.html`, png: `/a/${slug}.png` };
-}
-
-/** Canonical URL of the answer page for `eggId`, the link shared in the kind 1 note. */
-export function answerGatewayUrl(
-  pubkeyHex: string,
-  nestId: string,
-  eggId: string,
-  gateway = GATEWAY_DOMAIN,
-): string {
-  return new URL(answerPaths(answerSlug(eggId)).html, nestGatewayUrl(pubkeyHex, nestId, gateway)).toString();
+/** The answer site for `eggId` — the link in the kind 1 answer note. */
+export function answerGatewayUrl(pubkeyHex: string, eggId: string, gateway = GATEWAY_DOMAIN): string {
+  return namedSiteUrl(pubkeyHex, answerSiteId(eggId), gateway);
 }
 
 /**
  * Optional: the app itself deployed as a named nsite (identifier "ostrich") by
  * this hex pubkey. Only used as a fallback source of `site-assets.json` when the
- * running app is not a root-base build. Every nest site ships its own
- * `site-assets.json`, so a nest can always be hatched from another nest.
+ * running app is not a root-base build. Every nest and answer site ships its
+ * own `site-assets.json`, so a nest can always be hatched from another site.
  */
 export const APP_NSITE_ID = 'ostrich';
 
@@ -72,29 +50,26 @@ export function appNsiteUrl(gateway: string, path: string): string | undefined {
   return `https://${pubkeyToBase36(pubkey)}${APP_NSITE_ID}.${gateway}${path}`;
 }
 
-export interface NestSiteTarget {
-  npub: string;
-  nestId: string;
-  /** Set when served from a baked answer page (`/a/<slug>.html`). */
-  answerSlug?: string;
-}
+export type SiteTarget =
+  | { kind: 'nest'; npub: string }
+  | { kind: 'answer'; npub: string; eggId: string };
 
 /**
- * When the app is served from a nest's own nsite, its baked index.html tags the
- * nest via `<meta name="egg:npub|egg:id">` so the SPA opens that nest at "/".
- * Meta tags (not an inline script) keep `script-src 'self'` intact. Answer
- * pages add `<meta name="egg:answer">` so the SPA opens that answer instead.
+ * When the app is served from a nest or answer site, the baked index.html tags
+ * it with `<meta name="egg:npub">` (+ `<meta name="egg:answer">` = egg id on an
+ * answer site) so the SPA opens the right page at "/". Meta tags (not an inline
+ * script) keep `script-src 'self'` intact.
  */
-export function getNestSiteTarget(): NestSiteTarget | null {
+export function getSiteTarget(): SiteTarget | null {
   if (typeof document === 'undefined') return null;
   const npub = document.querySelector('meta[name="egg:npub"]')?.getAttribute('content');
-  const nestId = document.querySelector('meta[name="egg:id"]')?.getAttribute('content');
-  if (!npub || !nestId) return null;
-  const answer = document.querySelector('meta[name="egg:answer"]')?.getAttribute('content');
-  return answer && isAnswerSlug(answer) ? { npub, nestId, answerSlug: answer } : { npub, nestId };
+  if (!npub || !/^npub1[a-z0-9]+$/.test(npub)) return null;
+  const eggId = document.querySelector('meta[name="egg:answer"]')?.getAttribute('content');
+  if (eggId && /^[0-9a-f]{64}$/.test(eggId)) return { kind: 'answer', npub, eggId };
+  return { kind: 'nest', npub };
 }
 
-/** On a nest's own site "/" is the nest, so the app home lives at /home. */
+/** On a nest/answer site "/" is taken, so the app home lives at /home. */
 export function homePath(): string {
-  return getNestSiteTarget() ? '/home' : '/';
+  return getSiteTarget() ? '/home' : '/';
 }

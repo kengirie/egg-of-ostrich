@@ -5,7 +5,7 @@ import { nip19 } from 'nostr-tools';
 import { getEffectiveBlossomServers } from '@/lib/appBlossom';
 import { ensureAppAssets, fetchSiteAssets } from '@/lib/appMirror';
 import { uploadToServers, type BlossomServerResult } from '@/lib/blossomMulti';
-import { NEST_TAG } from '@/lib/egg';
+import { NEST_ID, NEST_TAG } from '@/lib/egg';
 import { buildNamedSiteManifest, buildServerList, type SitePath } from '@/lib/nsite';
 import { renderNestOgImage } from '@/lib/ogImage';
 import { LOOKUP_RELAYS, nestGatewayUrl } from '@/lib/siteConfig';
@@ -15,14 +15,12 @@ import { useCurrentUser } from './useCurrentUser';
 import { useNostrPublish } from './useNostrPublish';
 
 export interface NestMeta {
-  id: string;
   title: string;
   description: string;
   ownerName: string;
 }
 
 export interface PublishNestResult {
-  nestId: string;
   npub: string;
   gatewayUrl: string;
 }
@@ -40,7 +38,7 @@ interface PublishState {
 const IDLE: PublishState = { step: 'idle', failedServers: [], error: null, result: null };
 
 /**
- * Builds a nest entirely in the browser (Rostrum's publish flow, minus the PDF):
+ * Builds (or rebuilds) the user's one nest entirely in the browser (Rostrum's publish flow, minus the PDF):
  * OG card → mirror app assets → bake index.html → NIP-5A named-site manifest.
  * The manifest IS the nest; eggs hang off its address as kind 1111 comments.
  */
@@ -71,7 +69,7 @@ export function usePublishNest() {
 
       try {
         const npub = nip19.npubEncode(user.pubkey);
-        const gatewayUrl = nestGatewayUrl(user.pubkey, meta.id);
+        const gatewayUrl = nestGatewayUrl(user.pubkey);
 
         setState({ ...IDLE, step: 'drawing' });
         const og = await upload(await renderNestOgImage({ title: meta.title, ownerName: meta.ownerName }), 'og.png', 'image/png');
@@ -93,7 +91,7 @@ export function usePublishNest() {
           canonicalUrl: gatewayUrl,
           ogImageUrl: `${gatewayUrl}og.png`,
           npub,
-          nestId: meta.id,
+          nestId: NEST_ID,
           scripts: siteAssets.scripts,
           styles: siteAssets.styles,
         });
@@ -121,7 +119,7 @@ export function usePublishNest() {
           ...siteAssets.assets.map((asset) => ({ path: asset.path, sha256: asset.sha256 })),
         ];
         const template = await buildNamedSiteManifest({
-          identifier: meta.id,
+          identifier: NEST_ID,
           paths,
           servers,
           title: meta.title,
@@ -144,9 +142,8 @@ export function usePublishNest() {
           }
         }
 
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'my-nests', user.pubkey] });
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'nest', user.pubkey, meta.id] });
-        setState((prev) => ({ ...prev, step: 'done', result: { nestId: meta.id, npub, gatewayUrl } }));
+                queryClient.invalidateQueries({ queryKey: ['nostr', 'nest', user.pubkey, NEST_ID] });
+        setState((prev) => ({ ...prev, step: 'done', result: { npub, gatewayUrl } }));
       } catch (err) {
         console.error('Nest publish failed:', err);
         setState((prev) => ({

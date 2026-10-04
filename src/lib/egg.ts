@@ -9,12 +9,14 @@ export { HATCH_MAX_LENGTH };
 /**
  * Egg of Ostriches data model — no custom kinds.
  *
- * - A **nest** (question box) is a NIP-5A named site (kind 35128). Its address
- *   `35128:<owner>:<d>` is the NIP-22 root that every egg hangs from.
+ * - A **nest** (question box) is a NIP-5A named site (kind 35128), one per
+ *   user with `d` = `nest`. Its address `35128:<owner>:nest` is the NIP-22
+ *   root that every egg hangs from.
  * - An **egg** (question) is a top-level kind 1111 comment on the nest, signed
  *   by a throwaway key minted in the browser: fully anonymous, no login.
  * - A **hatch** (answer) is a kind 1 answer note by the owner quoting the egg
- *   (see `./answer`) linking to an answer page baked into the nest's nsite.
+ *   (see `./answer`), linking to the answer's own named site (`d` = `q` + the
+ *   first 12 hex chars of the egg id) whose OG card shows the question.
  * - **Cracked** (hidden) eggs are listed by the owner in a NIP-78 (kind 30078)
  *   app-data event, so visitors see the same cleaned-up nest.
  */
@@ -22,8 +24,13 @@ export { HATCH_MAX_LENGTH };
 export const COMMENT_KIND = 1111;
 export const APP_DATA_KIND = 30078;
 
-/** `t` tag on nest manifests so an owner's nests can be told apart from other nsites. */
+/** `t` tag on nest manifests so an owner's nest can be told apart from other nsites. */
 export const NEST_TAG = 'egg-of-ostriches';
+/** `t` tag on answer-site manifests. */
+export const ANSWER_SITE_TAG = 'egg-of-ostriches-answer';
+
+/** Every user has exactly one nest, always at this named-site identifier. */
+export const NEST_ID = 'nest';
 
 /** Maximum egg (question) length in characters. */
 export const EGG_MAX_LENGTH = 500;
@@ -74,6 +81,18 @@ function tagValue(event: NostrEvent, name: string): string | undefined {
 /** Named-site `d` rule (NIP-5A): `^[a-z0-9-]{1,13}$`, not ending with '-'. */
 export function isValidNestId(id: string): boolean {
   return /^[a-z0-9-]{1,13}$/.test(id) && !id.endsWith('-');
+}
+
+const ANSWER_SITE_ID_RE = /^q[0-9a-f]{12}$/;
+
+/** An answer site's named-site `d`: `q` + the first 12 hex chars of the egg id (13 chars, the NIP-5A max). */
+export function answerSiteId(eggId: string): string {
+  if (!/^[0-9a-f]{64}$/.test(eggId)) throw new Error(`Refusing bad egg id: ${eggId}`);
+  return `q${eggId.slice(0, 12)}`;
+}
+
+export function isAnswerSiteId(id: string): boolean {
+  return ANSWER_SITE_ID_RE.test(id);
 }
 
 /** Parse a kind 35128 manifest into a nest. Returns null for anything malformed. */

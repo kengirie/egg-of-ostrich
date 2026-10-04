@@ -7,7 +7,7 @@ import { layAnonymousEgg, nestAddress } from './egg';
 const ownerKey = generateSecretKey();
 const OWNER = getPublicKey(ownerKey);
 const NEST = 'ask-me';
-const ANSWER_URL = 'https://example.nwb.tf/a/0123456789abcdef.html';
+const ANSWER_URL = 'https://exampleq0123456789ab.nsite.lol/';
 
 function sign(template: { kind: number; content: string; tags: string[][] }, key = ownerKey, t = 1000): NostrEvent {
   return finalizeEvent({ ...template, created_at: t }, key);

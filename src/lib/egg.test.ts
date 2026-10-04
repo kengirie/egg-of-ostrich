@@ -54,7 +54,7 @@ describe('sortClutch', () => {
   const egg1 = layAnonymousEgg({ owner: OWNER, nestId: NEST, content: 'q1', difficulty: 4 });
   const egg2 = layAnonymousEgg({ owner: OWNER, nestId: NEST, content: 'q2', difficulty: 4 });
   const stranger = generateSecretKey();
-  const answerUrl = 'https://example.nwb.tf/a/0123456789abcdef.html';
+  const answerUrl = 'https://exampleq0123456789ab.nsite.lol/';
   const answer = (egg: NostrEvent, content: string, key: Uint8Array, t: number, nestId = NEST) =>
     sign(buildAnswerNoteTemplate({ owner: OWNER, nestId, egg, content, answerUrl }), key, t);
 

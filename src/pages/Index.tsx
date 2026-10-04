@@ -9,8 +9,9 @@ import { Layout } from '@/components/egg/Layout';
 import { Ostrich } from '@/components/egg/Ostrich';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useMyNests, useRecentHatches, type RecentHatch } from '@/hooks/useEggs';
-import { answerSlug, nestGatewayUrl } from '@/lib/siteConfig';
+import { useNest, useRecentHatches, type RecentHatch } from '@/hooks/useEggs';
+import { NEST_ID, answerSiteId } from '@/lib/egg';
+import { nestGatewayUrl } from '@/lib/siteConfig';
 import { timeAgo } from '@/lib/time';
 
 const Index = () => {
@@ -41,7 +42,7 @@ const Index = () => {
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild className="sticker h-14 rounded-full px-8 text-lg font-black transition-transform hover:-rotate-2 hover:scale-105">
-              <Link to="/new">🪺 巣をつくる</Link>
+              <Link to="/new">🪺 質問箱を開く</Link>
             </Button>
           </div>
         </div>
@@ -56,9 +57,9 @@ const Index = () => {
       {/* how */}
       <section className="mt-16 grid gap-5 sm:grid-cols-3">
         {[
-          { icon: <span className="text-4xl">🪺</span>, title: '巣をつくる', body: 'Nostrでログインして巣を公開。巣はそのままnsiteになり、専用リンクが発行されます。' },
+          { icon: <span className="text-4xl">🪺</span>, title: '質問箱を開く', body: 'Nostrでログインして巣（質問箱）をひとつ公開。巣はそのままnsiteになり、専用リンクが発行されます。' },
           { icon: <EggShape className="h-12 w-10" />, title: '卵を投げる', body: 'リンクを開いた人が質問を書いて投げるだけ。ログイン不要・完全匿名。' },
-          { icon: <EggShape state="hatched" className="h-12 w-10" />, title: '孵す', body: '巣の主が回答すると卵が孵って、みんなに見えるようになります。' },
+          { icon: <EggShape state="hatched" className="h-12 w-10" />, title: '孵す', body: '巣の主が回答すると卵が孵り、質問カードつきの回答リンクがkind 1でタイムラインに流れます。' },
         ].map((c, i) => (
           <div key={c.title} className={`sticker rounded-3xl bg-card p-5 ${i % 2 ? 'rotate-1' : '-rotate-1'}`}>
             <div className="flex h-12 items-center">{c.icon}</div>
@@ -70,34 +71,34 @@ const Index = () => {
         ))}
       </section>
 
-      {user && <MyNests pubkey={user.pubkey} />}
+      {user && <MyNest pubkey={user.pubkey} />}
       <RecentHatches />
     </Layout>
   );
 };
 
-function MyNests({ pubkey }: { pubkey: string }) {
-  const nests = useMyNests(pubkey);
+function MyNest({ pubkey }: { pubkey: string }) {
+  const nest = useNest(pubkey, NEST_ID);
   const npub = nip19.npubEncode(pubkey);
   return (
     <section className="mt-16">
-      <h2 className="text-2xl font-black">あなたの巣</h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        {nests.isLoading && <Skeleton className="h-24 rounded-3xl" />}
-        {nests.data?.length === 0 && (
-          <div className="rounded-3xl border-[3px] border-dashed border-border p-6 text-center font-bold text-muted-foreground sm:col-span-2">
-            まだ巣がありません。<Link to="/new" className="text-primary underline">ひとつつくろう</Link>
+      <h2 className="text-2xl font-black">あなたの質問箱</h2>
+      <div className="mt-4">
+        {nest.isLoading ? (
+          <Skeleton className="h-24 rounded-3xl" />
+        ) : !nest.data ? (
+          <div className="rounded-3xl border-[3px] border-dashed border-border p-6 text-center font-bold text-muted-foreground">
+            まだ質問箱がありません。<Link to="/new" className="text-primary underline">開いてみよう</Link>
           </div>
-        )}
-        {nests.data?.map((nest) => (
-          <div key={nest.id} className="sticker flex items-center gap-4 rounded-3xl bg-card p-4">
+        ) : (
+          <div className="sticker flex flex-wrap items-center gap-4 rounded-3xl bg-card p-4">
             <EggShape className="h-14 w-12 shrink-0" />
             <div className="min-w-0 flex-1">
-              <Link to={`/${npub}/${nest.id}`} className="block truncate text-lg font-extrabold hover:underline">
-                {nest.title}
+              <Link to={`/${npub}`} className="block truncate text-lg font-extrabold hover:underline">
+                {nest.data.title}
               </Link>
               <a
-                href={nestGatewayUrl(pubkey, nest.id)}
+                href={nestGatewayUrl(pubkey)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block truncate text-sm text-muted-foreground hover:underline"
@@ -105,8 +106,11 @@ function MyNests({ pubkey }: { pubkey: string }) {
                 nsiteで開く ↗
               </a>
             </div>
+            <Link to="/new" className="text-sm font-extrabold text-primary underline">
+              編集
+            </Link>
           </div>
-        ))}
+        )}
       </div>
     </section>
   );
@@ -136,14 +140,14 @@ function RecentHatchCard({ hatch, index }: { hatch: RecentHatch; index: number }
       className={`sticker rounded-3xl bg-card p-5 transition-transform hover:rotate-0 ${index % 2 ? 'rotate-1' : '-rotate-1'}`}
     >
       <Link
-        to={`/${npub}/${hatch.nestId}/a/${answerSlug(hatch.eggId)}`}
+        to={`/${npub}/${answerSiteId(hatch.eggId)}`}
         className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring"
       >
         <p className="line-clamp-3 font-extrabold break-words">🥚 {hatch.question}</p>
         <p className="mt-3 line-clamp-3 rounded-2xl bg-secondary px-3 py-2 break-words text-secondary-foreground">🐣 {hatch.answer}</p>
       </Link>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
-        <Link to={`/${npub}/${hatch.nestId}`} className="hover:underline">
+        <Link to={`/${npub}`} className="hover:underline">
           {name} の巣 · {timeAgo(hatch.createdAt)}
         </Link>
         <AnswerLink url={hatch.url} className="text-xs text-foreground" />

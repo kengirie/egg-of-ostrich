@@ -4,11 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   APP_DATA_KIND,
   COMMENT_KIND,
-  NEST_TAG,
+  NEST_ID,
   buildCrackedTemplate,
   crackedListId,
-  isEggNest,
-  isValidNestId,
   layAnonymousEgg,
   nestAddress,
   parseCrackedIds,
@@ -44,32 +42,6 @@ export function useNest(owner: string | undefined, nestId: string | undefined) {
       );
       const event = newest(events);
       return event ? parseNest(event) : null;
-    },
-  });
-}
-
-/** Nests created with this app by `owner` (tagged `t: egg-of-ostriches`). */
-export function useMyNests(owner: string | undefined) {
-  const { nostr } = useNostr();
-  return useQuery<Nest[]>({
-    queryKey: ['nostr', 'my-nests', owner],
-    enabled: Boolean(owner),
-    queryFn: async ({ signal }) => {
-      const events = await nostr.query(
-        [{ kinds: [NAMED_SITE_KIND], authors: [owner!], '#t': [NEST_TAG], limit: 50 }],
-        { signal: timeout(signal) },
-      );
-      const latest = new Map<string, NostrEvent>();
-      for (const e of events) {
-        if (!isEggNest(e)) continue;
-        const d = e.tags.find(([n]) => n === 'd')?.[1] ?? '';
-        const prev = latest.get(d);
-        if (!prev || e.created_at > prev.created_at) latest.set(d, e);
-      }
-      return Array.from(latest.values())
-        .map(parseNest)
-        .filter((n): n is Nest => n !== null)
-        .sort((a, b) => b.createdAt - a.createdAt);
     },
   });
 }
@@ -159,12 +131,15 @@ export interface RecentHatch {
 
 const HEX64 = /^[0-9a-f]{64}$/;
 
-/** `<owner>`/`<nest id>` from an answer note's `a` tag, or null if malformed. */
+/**
+ * `<owner>`/`<nest id>` from an answer note's `a` tag, or null if malformed.
+ * Only the one-nest-per-user format (`d` = `nest`) counts.
+ */
 function answerTarget(event: NostrEvent): { owner: string; nestId: string } | null {
   const address = event.tags.find(([n]) => n === 'a')?.[1] ?? '';
   const [kind, owner, nestId, ...rest] = address.split(':');
   if (rest.length || kind !== String(NAMED_SITE_KIND) || !owner || !HEX64.test(owner)) return null;
-  if (!nestId || !isValidNestId(nestId) || owner !== event.pubkey) return null;
+  if (nestId !== NEST_ID || owner !== event.pubkey) return null;
   return { owner, nestId };
 }
 

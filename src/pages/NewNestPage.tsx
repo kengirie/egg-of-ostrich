@@ -12,14 +12,12 @@ import { Ostrich } from '@/components/egg/Ostrich';
 import { ShareLink } from '@/components/egg/ShareLink';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useNest } from '@/hooks/useEggs';
 import { usePublishNest, type PublishStep } from '@/hooks/usePublishNest';
-import { isValidNestId } from '@/lib/egg';
+import { NEST_ID } from '@/lib/egg';
 import { renderNestOgImage } from '@/lib/ogImage';
+import { nestGatewayUrl } from '@/lib/siteConfig';
 import { cn } from '@/lib/utils';
-
-function randomNestId(): string {
-  return `egg-${Math.random().toString(36).slice(2, 7)}`;
-}
 
 const STEPS: { key: PublishStep; label: string }[] = [
   { key: 'drawing', label: '巣の看板（OG画像）を描いています' },
@@ -28,20 +26,27 @@ const STEPS: { key: PublishStep; label: string }[] = [
   { key: 'announcing', label: 'サバンナ中（リレー）に知らせています' },
 ];
 
+/**
+ * Open (or edit) the user's one question box. Re-publishing keeps the same
+ * `d` (`nest`), so the link and every egg stay where they are.
+ */
 export default function NewNestPage() {
-  useSeoMeta({ title: '巣をつくる | Egg of Ostriches' });
   const { user } = useCurrentUser();
   const author = useAuthor(user?.pubkey);
   const ownerName = author.data?.metadata?.display_name || author.data?.metadata?.name || '名無しのダチョウ';
+  const existing = useNest(user?.pubkey, NEST_ID);
+  const hasNest = Boolean(existing.data);
+  useSeoMeta({ title: `${hasNest ? '質問箱を編集' : '質問箱を開く'} | Egg of Ostriches` });
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [nestId, setNestId] = useState(randomNestId);
+  // null = untouched: show the current nest's values until the user types.
+  const [titleInput, setTitle] = useState<string | null>(null);
+  const [descriptionInput, setDescription] = useState<string | null>(null);
+  const title = titleInput ?? existing.data?.title ?? '';
+  const description = descriptionInput ?? existing.data?.description ?? '';
   const [preview, setPreview] = useState<string>();
   const { step, error, result, failedServers, publish, reset } = usePublishNest();
 
   const effectiveTitle = title.trim() || `${ownerName}の巣`;
-  const idValid = isValidNestId(nestId);
   const busy = STEPS.some((s) => s.key === step);
 
   // Live preview of the share card, debounced.
@@ -70,9 +75,9 @@ export default function NewNestPage() {
       <Layout>
         <div className="sticker mx-auto mt-10 max-w-lg rounded-3xl bg-card p-8 text-center">
           <Ostrich className="mx-auto h-40 w-36" />
-          <h1 className="mt-4 text-2xl font-extrabold">巣をつくるにはログイン</h1>
+          <h1 className="mt-4 text-2xl font-extrabold">質問箱を開くにはログイン</h1>
           <p className="mt-2 text-muted-foreground">
-            巣はあなたのNostrの鍵で公開されます。卵を投げる側はログイン不要・完全匿名です。
+            質問箱はあなたのNostrの鍵で公開されます。卵を投げる側はログイン不要・完全匿名です。
           </p>
           <LoginArea className="mt-6" />
         </div>
@@ -88,17 +93,17 @@ export default function NewNestPage() {
             <Ostrich className="h-40 w-36" />
             <EggShape className="h-20 w-16 motion-safe:animate-wobble" />
           </div>
-          <h1 className="text-3xl font-black">巣ができた！</h1>
+          <h1 className="text-3xl font-black">{hasNest ? '質問箱を更新した！' : '質問箱ができた！'}</h1>
           <p className="text-muted-foreground">
             このリンクをシェアすれば、誰でも匿名で卵（質問）を投げこめます。ゲートウェイへの反映に少し時間がかかることがあります。
           </p>
-          <ShareLink url={result.gatewayUrl} />
+          <ShareLink url={result.gatewayUrl} label="あなたの質問箱のリンク" />
           <div className="flex flex-wrap justify-center gap-3">
             <Button asChild className="sticker-sm rounded-full font-extrabold">
-              <Link to={`/${result.npub}/${result.nestId}`}>巣をのぞく（回答はここから）</Link>
+              <Link to={`/${result.npub}`}>質問箱をのぞく（回答はここから）</Link>
             </Button>
-            <Button variant="outline" className="sticker-sm rounded-full font-bold" onClick={() => { reset(); setNestId(randomNestId()); }}>
-              もうひとつつくる
+            <Button variant="outline" className="sticker-sm rounded-full font-bold" onClick={reset}>
+              もう一度編集する
             </Button>
           </div>
         </div>
@@ -108,17 +113,22 @@ export default function NewNestPage() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idValid || busy) return;
-    publish({ id: nestId, title: effectiveTitle, description: description.trim(), ownerName });
+    if (busy) return;
+    publish({ title: effectiveTitle, description: description.trim(), ownerName });
   };
 
   return (
     <Layout>
-      <h1 className="mt-4 -rotate-1 text-4xl font-black sm:text-5xl">巣をつくる 🪺</h1>
+      <h1 className="mt-4 -rotate-1 text-4xl font-black sm:text-5xl">{hasNest ? '質問箱を編集 🪺' : '質問箱を開く 🪺'}</h1>
+      {hasNest && (
+        <p className="mt-3 font-bold text-muted-foreground">
+          質問箱はひとり1つ。更新してもリンクと届いた卵はそのままです。
+        </p>
+      )}
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_1fr]">
         <form onSubmit={onSubmit} className="sticker space-y-5 rounded-3xl bg-card p-6">
           <div className="space-y-2">
-            <label htmlFor="nest-title" className="block font-extrabold">巣の名前</label>
+            <label htmlFor="nest-title" className="block font-extrabold">質問箱の名前</label>
             <Input
               id="nest-title"
               value={title}
@@ -140,21 +150,6 @@ export default function NewNestPage() {
               className="sticker-sm rounded-2xl bg-shell"
             />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="nest-id" className="block font-extrabold">巣ID（リンクの一部）</label>
-            <Input
-              id="nest-id"
-              value={nestId}
-              onChange={(e) => setNestId(e.target.value.toLowerCase())}
-              aria-invalid={!idValid}
-              maxLength={13}
-              className="sticker-sm h-12 rounded-2xl bg-shell font-mono"
-            />
-            <p className={cn('text-sm', idValid ? 'text-muted-foreground' : 'font-bold text-destructive')}>
-              小文字英数字とハイフン、13文字まで（末尾ハイフン不可）。同じIDで作り直すと巣が上書きされ、卵はそのまま残ります。
-            </p>
-          </div>
-
           {busy && (
             <ol className="space-y-2 rounded-2xl bg-muted p-4" aria-live="polite">
               {STEPS.map((s, i) => {
@@ -178,10 +173,10 @@ export default function NewNestPage() {
 
           <Button
             type="submit"
-            disabled={!idValid || busy}
+            disabled={busy || existing.isLoading}
             className="sticker-sm h-12 w-full rounded-full text-lg font-extrabold transition-transform hover:-rotate-1 hover:scale-[1.02]"
           >
-            {busy ? <Loader2 className="size-5 animate-spin" /> : '🪺'} 巣を公開する
+            {busy ? <Loader2 className="size-5 animate-spin" /> : '🪺'} {hasNest ? '質問箱を更新する' : '質問箱を公開する'}
           </Button>
         </form>
 
@@ -195,7 +190,7 @@ export default function NewNestPage() {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            巣はNIP-5Aのnsiteとして公開され、<code>https://〈あなた〉{nestId}.nwb.tf/</code> がそのまま質問箱のリンクになります。
+            質問箱はNIP-5Aのnsiteとして公開され、<code className="break-all">{nestGatewayUrl(user.pubkey)}</code> がそのまま質問箱のリンクになります。
           </p>
         </div>
       </div>

@@ -49,7 +49,7 @@ export function HatchedEggCard({ egg, ownerName, index = 0 }: { egg: Egg; ownerN
   );
 }
 
-/** "回答リンク": the answer page (OGP card) on the nest's nsite. `url` is already sanitized. */
+/** "回答リンク": the answer's own nsite (its OGP card shows the question). `url` is already sanitized. */
 export function AnswerLink({ url, className }: { url: string; className?: string }) {
   return (
     <a
@@ -77,9 +77,10 @@ export function SealedEgg({ index }: { index: number }) {
 }
 
 const ANSWER_STEPS: { step: AnswerStep; label: string }[] = [
-  { step: 'drawing', label: '卵の絵を描いています' },
+  { step: 'drawing', label: '質問の卵の絵を描いています' },
   { step: 'uploading', label: '回答ページをこしらえています' },
-  { step: 'announcing', label: '巣に回答ページを置いています' },
+  { step: 'announcing', label: '回答ページをnsiteとして公開しています' },
+  { step: 'waiting', label: 'ゲートウェイに回答ページが届くのを待っています' },
   { step: 'posting', label: 'タイムラインに孵しています' },
 ];
 
@@ -110,7 +111,7 @@ function AnswerProgress({ step }: { step: AnswerStep }) {
 
 /**
  * Owner's view of an egg: hatch it (answer), re-answer it, or crack it (hide).
- * Hatching bakes an answer page into the nest and posts a kind 1 note linking to it.
+ * Hatching publishes the answer as its own nsite and posts a kind 1 note linking to it.
  */
 export function OwnerEggCard({
   egg,
@@ -133,15 +134,28 @@ export function OwnerEggCard({
   const onHatch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await hatch.publish({ egg, content: answer, ownerName });
-      setOpen(false);
-      onHatched?.();
-      toast({
-        title: 'ピヨッ！卵が孵りました 🐣',
-        description: '回答リンクつきの kind 1 ノートをタイムラインに投稿しました。',
-      });
+      const result = await hatch.publish({ egg, content: answer, ownerName });
+      // null = the answer site is up but the gateway is slow; the note is held.
+      if (result) onPosted();
     } catch (err) {
       toast({ title: '孵化に失敗…', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
+    }
+  };
+
+  const onPosted = () => {
+    setOpen(false);
+    onHatched?.();
+    toast({
+      title: 'ピヨッ！卵が孵りました 🐣',
+      description: '回答リンクつきの kind 1 ノートをタイムラインに投稿しました。',
+    });
+  };
+
+  const onPostHeld = async (force: boolean) => {
+    try {
+      if (await hatch.postNote({ force })) onPosted();
+    } catch (err) {
+      toast({ title: '投稿に失敗…', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
   };
 
@@ -204,6 +218,22 @@ export function OwnerEggCard({
             className="sticker-sm rounded-2xl bg-shell"
           />
           {hatch.isPending && <AnswerProgress step={hatch.step} />}
+          {hatch.step === 'stalled' && hatch.pending && (
+            <div className="sticker-sm space-y-2 rounded-2xl bg-shell px-4 py-3 text-sm font-bold" role="status">
+              <p>
+                回答ページは公開できましたが、ゲートウェイにまだ届いていません。今投稿すると、リンクのカードが質問の画像にならないことがあります。
+              </p>
+              <p className="break-all text-xs text-muted-foreground">{hatch.pending.answerUrl}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" className="rounded-full font-bold" onClick={() => onPostHeld(false)}>
+                  もう一度確かめて投稿
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="rounded-full font-bold" onClick={() => onPostHeld(true)}>
+                  このまま投稿する
+                </Button>
+              </div>
+            </div>
+          )}
           {hatch.step === 'error' && hatch.error && (
             <p className="text-sm font-bold text-destructive">うまく孵りませんでした：{hatch.error}</p>
           )}
@@ -243,7 +273,11 @@ export function OwnerEggCard({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <Button type="submit" disabled={!answer.trim() || hatch.isPending} className="sticker-sm rounded-full font-extrabold">
+            <Button
+              type="submit"
+              disabled={!answer.trim() || hatch.isPending || hatch.step === 'stalled'}
+              className="sticker-sm rounded-full font-extrabold"
+            >
               {hatch.isPending ? <Loader2 className="size-4 animate-spin" /> : '🐣'} 孵化させる
             </Button>
           </div>

@@ -64,20 +64,7 @@ function assertNamedSiteIdentifier(identifier: string): void {
   }
 }
 
-/**
- * A site path must be absolute, made of URL-safe characters, and free of
- * empty, "." or ".." segments so a gateway can't be steered outside the site.
- */
-function isValidSitePath(path: string): boolean {
-  if (!/^\/[A-Za-z0-9._~-]+(\/[A-Za-z0-9._~-]+)*$/.test(path)) return false;
-  return path.split('/').slice(1).every((segment) => segment !== '.' && segment !== '..');
-}
-
-function isValidSha256(sha256: string): boolean {
-  return /^[0-9a-f]{64}$/.test(sha256);
-}
-
-/** Build a named-site manifest for a deck. Replaces any previous site with the same `d`. */
+/** Build a named-site manifest (a nest or an answer site). Replaces any previous site with the same `d`. */
 export async function buildNamedSiteManifest(opts: {
   identifier: string;
   paths: SitePath[];
@@ -97,59 +84,6 @@ export async function buildNamedSiteManifest(opts: {
   ];
   if (title) tags.push(['title', title]);
   if (description) tags.push(['description', description]);
-
-  return { kind: NAMED_SITE_KIND, content: '', tags };
-}
-
-/**
- * Rebuild an existing named-site manifest with extra (or replaced) paths.
- *
- * Existing well-formed `path` tags are kept; an added path with the same
- * `path` replaces the old hash. The aggregate `x` tag is recomputed over the
- * final path set, and every other tag (`server`, `title`, unknown…) is kept in
- * its original order. Output ordering matches `buildNamedSiteManifest`:
- * `d`, paths, aggregate `x`, then the rest.
- */
-export async function rebuildNamedSiteManifest(
-  existing: { tags: string[][] },
-  addPaths: SitePath[],
-): Promise<SiteManifestTemplate> {
-  for (const { path, sha256 } of addPaths) {
-    if (!isValidSitePath(path)) throw new Error(`Invalid site path: ${path}`);
-    if (!isValidSha256(sha256)) throw new Error(`Invalid sha256 for ${path}: ${sha256}`);
-  }
-
-  const dTag = existing.tags.find(([name]) => name === 'd');
-  const identifier = dTag?.[1] ?? '';
-  assertNamedSiteIdentifier(identifier);
-
-  // Map preserves first-insertion order, so overrides stay in place and new paths append.
-  const pathMap = new Map<string, string>();
-  const rest: string[][] = [];
-  for (const tag of existing.tags) {
-    const [name, value, extra] = tag;
-    if (name === 'd') continue;
-    if (name === 'path') {
-      // Malformed existing entries are dropped rather than failing the whole rebuild.
-      if (typeof value === 'string' && typeof extra === 'string' && isValidSitePath(value) && isValidSha256(extra)) {
-        pathMap.set(value, extra);
-      }
-      continue;
-    }
-    if (name === 'x' && tag[2] === 'aggregate') continue;
-    rest.push([...tag]);
-  }
-  for (const { path, sha256 } of addPaths) pathMap.set(path, sha256);
-
-  const paths: SitePath[] = [...pathMap].map(([path, sha256]) => ({ path, sha256 }));
-  if (paths.length === 0) throw new Error('A site manifest needs at least one path');
-
-  const tags: string[][] = [
-    ['d', identifier],
-    ...paths.map(({ path, sha256 }) => ['path', path, sha256]),
-    ['x', await aggregateHash(paths), 'aggregate'],
-    ...rest,
-  ];
 
   return { kind: NAMED_SITE_KIND, content: '', tags };
 }

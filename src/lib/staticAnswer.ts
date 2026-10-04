@@ -1,8 +1,9 @@
 /**
- * Answer-time HTML baked into the nest's nsite at `/a/<slug>.html`. The kind 1
- * note announcing an answer links here, so the link unfurls as an OG card with
- * the answer (like マシュマロ) — and opening it boots the full app, same as the
- * nest page, which reads `<meta name="egg:answer">` to show that answer.
+ * Answer-time HTML: the `index.html` of an answer's own named site
+ * (`https://<pubkeyB36>q<12 hex>.<gateway>/`). The kind 1 note announcing the
+ * answer links here, so the link unfurls as an OG card showing the question
+ * (like マシュマロ) — and opening it boots the full app, which reads
+ * `<meta name="egg:answer">` (the egg id) to show that answer.
  */
 
 import {
@@ -12,7 +13,6 @@ import {
   FAVICON_HREF,
   NEST_SITE_CSP,
 } from './staticNest';
-import { isAnswerSlug } from './siteConfig';
 
 /** Max characters of the answer shown in og:description before truncating. */
 const DESCRIPTION_MAX = 120;
@@ -24,15 +24,17 @@ export interface AnswerAppHtmlInput {
   question: string;
   /** The owner's answer text. */
   answer: string;
-  /** Absolute canonical URL of this answer page on its gateway. */
+  /** Absolute canonical URL of this answer site on its gateway. */
   canonicalUrl: string;
-  /** Absolute URL of the 1200x630 OG image. */
+  /**
+   * Absolute URL of the 1200x630 question card. Use the Blossom blob URL: it is
+   * immutable and doesn't depend on any gateway being up or fresh.
+   */
   ogImageUrl: string;
   /** npub of the nest owner. */
   npub: string;
-  nestId: string;
-  /** `^[0-9a-f]{16}$`, see `answerSlug()` in siteConfig. */
-  answerSlug: string;
+  /** The answered egg's id (64 hex). */
+  eggId: string;
   /** App entry module scripts from site-assets.json. */
   scripts: string[];
   /** App entry stylesheets from site-assets.json. */
@@ -58,8 +60,7 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
   const styles = input.styles.map(assertAssetRef);
 
   if (!/^npub1[a-z0-9]+$/.test(input.npub)) throw new Error(`Refusing bad npub: ${input.npub}`);
-  if (!/^[a-z0-9-]{1,13}$/.test(input.nestId)) throw new Error(`Refusing bad nest id: ${input.nestId}`);
-  if (!isAnswerSlug(input.answerSlug)) throw new Error(`Refusing bad answer slug: ${input.answerSlug}`);
+  if (!/^[0-9a-f]{64}$/.test(input.eggId)) throw new Error(`Refusing bad egg id: ${input.eggId}`);
 
   const styleTags = styles
     .map((href) => `<link rel="stylesheet" crossorigin href="${escapeHtml(href)}">`)
@@ -92,8 +93,7 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
 <meta name="twitter:description" content="${description}">
 <meta name="twitter:image" content="${ogImage}">
 <meta name="egg:npub" content="${escapeHtml(input.npub)}">
-<meta name="egg:id" content="${escapeHtml(input.nestId)}">
-<meta name="egg:answer" content="${escapeHtml(input.answerSlug)}">
+<meta name="egg:answer" content="${escapeHtml(input.eggId)}">
 ${styleTags}
 ${scriptTags}
 </head>
@@ -111,4 +111,13 @@ ${scriptTags}
 </body>
 </html>
 `;
+}
+
+/**
+ * Whether `html` (fetched from a gateway) is this answer's baked page. Until a
+ * gateway has the new manifest it serves a 404/fallback page instead, and a
+ * client unfurling the link at that moment would cache the wrong card.
+ */
+export function isAnswerPageLive(html: string, eggId: string): boolean {
+  return /^[0-9a-f]{64}$/.test(eggId) && html.includes(`<meta name="egg:answer" content="${eggId}">`);
 }

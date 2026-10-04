@@ -1,19 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { renderAnswerAppHtml } from './staticAnswer';
-import { answerGatewayUrl, answerPaths, answerSlug, getNestSiteTarget, nestGatewayUrl } from './siteConfig';
+import { answerSiteId, isAnswerSiteId, isValidNestId } from './egg';
+import { isAnswerPageLive, renderAnswerAppHtml } from './staticAnswer';
+import { answerGatewayUrl, getSiteTarget, nestGatewayUrl } from './siteConfig';
 
-const SLUG = '0123456789abcdef';
+const EGG_ID = `0123456789ab${'c'.repeat(52)}`;
+const SITE = 'https://abcq0123456789ab.nsite.lol/';
+const OG = `https://blossom.example/${'d'.repeat(64)}.png`;
 
 const BASE = {
   ownerName: 'ostrich',
   nestTitle: 'ダチョウの巣',
   question: '好きな食べ物は？',
   answer: '卵かけご飯です。',
-  canonicalUrl: `https://abcask.nwb.tf/a/${SLUG}.html`,
-  ogImageUrl: `https://abcask.nwb.tf/a/${SLUG}.png`,
+  canonicalUrl: SITE,
+  ogImageUrl: OG,
   npub: 'npub1abc',
-  nestId: 'ask',
-  answerSlug: SLUG,
+  eggId: EGG_ID,
   scripts: ['/assets/index-abc.js'],
   styles: ['/assets/index-abc.css'],
 };
@@ -26,13 +28,14 @@ describe('renderAnswerAppHtml', () => {
     expect(html).toContain('<meta property="og:site_name" content="Egg of Ostriches">');
     expect(html).toContain('<meta property="og:title" content="ostrichの巣に届いた卵">');
     expect(html).toContain('<meta property="og:description" content="卵かけご飯です。">');
-    expect(html).toContain(`<meta property="og:url" content="https://abcask.nwb.tf/a/${SLUG}.html">`);
-    expect(html).toContain(`<meta property="og:image" content="https://abcask.nwb.tf/a/${SLUG}.png">`);
+    expect(html).toContain(`<meta property="og:url" content="${SITE}">`);
+    expect(html).toContain(`<meta property="og:image" content="${OG}">`);
+    expect(html).toContain(`<meta name="twitter:image" content="${OG}">`);
     expect(html).toContain('<meta property="og:image:width" content="1200">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain('<meta name="egg:npub" content="npub1abc">');
-    expect(html).toContain('<meta name="egg:id" content="ask">');
-    expect(html).toContain(`<meta name="egg:answer" content="${SLUG}">`);
+    expect(html).toContain(`<meta name="egg:answer" content="${EGG_ID}">`);
+    expect(html).not.toContain('egg:id');
     expect(html).toContain('<link rel="stylesheet" crossorigin href="/assets/index-abc.css">');
     expect(html).toContain('<script type="module" crossorigin src="/assets/index-abc.js"></script>');
     expect(html).toContain("script-src 'self'");
@@ -67,32 +70,40 @@ describe('renderAnswerAppHtml', () => {
     expect(() => renderAnswerAppHtml({ ...BASE, scripts: ['https://evil.example/x.js'] })).toThrow();
     expect(() => renderAnswerAppHtml({ ...BASE, styles: ['/x.css"><script>'] })).toThrow();
     expect(() => renderAnswerAppHtml({ ...BASE, npub: 'npub1"x' })).toThrow();
-    expect(() => renderAnswerAppHtml({ ...BASE, nestId: 'Bad"id' })).toThrow();
-    expect(() => renderAnswerAppHtml({ ...BASE, answerSlug: 'ABCDEF0123456789' })).toThrow();
-    expect(() => renderAnswerAppHtml({ ...BASE, answerSlug: '0123' })).toThrow();
+    expect(() => renderAnswerAppHtml({ ...BASE, eggId: 'not-an-id' })).toThrow();
   });
 });
 
-describe('answer URL helpers', () => {
+describe('isAnswerPageLive', () => {
+  it('recognizes the baked answer page and nothing else', () => {
+    expect(isAnswerPageLive(renderAnswerAppHtml(BASE), EGG_ID)).toBe(true);
+    expect(isAnswerPageLive(renderAnswerAppHtml(BASE), 'e'.repeat(64))).toBe(false);
+    expect(isAnswerPageLive('<html><meta name="egg:npub" content="npub1abc"></html>', EGG_ID)).toBe(false);
+    expect(isAnswerPageLive('', 'bad')).toBe(false);
+  });
+});
+
+describe('answer sites', () => {
   const PUBKEY = 'f'.repeat(64);
-  const EGG_ID = `${SLUG}${'a'.repeat(48)}`;
 
-  it('derives the slug and paths from the egg id', () => {
-    expect(answerSlug(EGG_ID)).toBe(SLUG);
-    expect(answerPaths(SLUG)).toEqual({ html: `/a/${SLUG}.html`, png: `/a/${SLUG}.png` });
-    expect(() => answerSlug('not-an-id')).toThrow();
-    expect(() => answerPaths('../x')).toThrow();
+  it('derives a 13-char named-site id from the egg id', () => {
+    expect(answerSiteId(EGG_ID)).toBe('q0123456789ab');
+    expect(isAnswerSiteId('q0123456789ab')).toBe(true);
+    expect(isAnswerSiteId('nest')).toBe(false);
+    expect(isValidNestId(answerSiteId(EGG_ID))).toBe(true);
+    expect(() => answerSiteId('not-an-id')).toThrow();
   });
 
-  it('builds the answer URL on the nest gateway', () => {
-    expect(answerGatewayUrl(PUBKEY, 'ask', EGG_ID)).toBe(`${nestGatewayUrl(PUBKEY, 'ask')}a/${SLUG}.html`);
-    expect(answerGatewayUrl(PUBKEY, 'ask', EGG_ID, 'nsite.lol')).toMatch(
-      new RegExp(`^https://[0-9a-z]{50}ask\\.nsite\\.lol/a/${SLUG}\\.html$`),
-    );
+  it('builds nest and answer links on the canonical gateway', () => {
+    expect(nestGatewayUrl(PUBKEY)).toMatch(/^https:\/\/[0-9a-z]{50}nest\.nsite\.lol\/$/);
+    const url = answerGatewayUrl(PUBKEY, EGG_ID);
+    expect(url).toMatch(/^https:\/\/[0-9a-z]{50}q0123456789ab\.nsite\.lol\/$/);
+    // The subdomain label must fit DNS's 63-character limit.
+    expect(new URL(url).hostname.split('.')[0].length).toBeLessThanOrEqual(63);
   });
 });
 
-describe('getNestSiteTarget', () => {
+describe('getSiteTarget', () => {
   function addMeta(name: string, content: string) {
     const meta = document.createElement('meta');
     meta.setAttribute('name', name);
@@ -104,27 +115,28 @@ describe('getNestSiteTarget', () => {
     document.head.querySelectorAll('meta[name^="egg:"]').forEach((el) => el.remove());
   });
 
-  it('returns null outside a nest site', () => {
-    expect(getNestSiteTarget()).toBeNull();
+  it('returns null on normal app hosts', () => {
+    expect(getSiteTarget()).toBeNull();
   });
 
-  it('reads the nest without an answer', () => {
+  it('reads a nest site', () => {
     addMeta('egg:npub', 'npub1abc');
-    addMeta('egg:id', 'ask');
-    expect(getNestSiteTarget()).toEqual({ npub: 'npub1abc', nestId: 'ask' });
+    addMeta('egg:id', 'nest');
+    expect(getSiteTarget()).toEqual({ kind: 'nest', npub: 'npub1abc' });
   });
 
-  it('reads egg:answer on an answer page', () => {
+  it('reads an answer site', () => {
     addMeta('egg:npub', 'npub1abc');
-    addMeta('egg:id', 'ask');
-    addMeta('egg:answer', SLUG);
-    expect(getNestSiteTarget()).toEqual({ npub: 'npub1abc', nestId: 'ask', answerSlug: SLUG });
+    addMeta('egg:answer', EGG_ID);
+    expect(getSiteTarget()).toEqual({ kind: 'answer', npub: 'npub1abc', eggId: EGG_ID });
   });
 
-  it('ignores a malformed egg:answer', () => {
+  it('ignores a malformed egg:answer or npub', () => {
     addMeta('egg:npub', 'npub1abc');
-    addMeta('egg:id', 'ask');
     addMeta('egg:answer', '../evil');
-    expect(getNestSiteTarget()).toEqual({ npub: 'npub1abc', nestId: 'ask' });
+    expect(getSiteTarget()).toEqual({ kind: 'nest', npub: 'npub1abc' });
+    document.head.querySelectorAll('meta[name^="egg:"]').forEach((el) => el.remove());
+    addMeta('egg:npub', 'npub1"x');
+    expect(getSiteTarget()).toBeNull();
   });
 });

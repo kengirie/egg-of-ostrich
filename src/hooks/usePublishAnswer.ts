@@ -5,22 +5,38 @@ import { useQueryClient } from '@tanstack/react-query';
 import { nip19 } from 'nostr-tools';
 import { buildAnswerNoteTemplate } from '@/lib/answer';
 import { getEffectiveBlossomServers } from '@/lib/appBlossom';
-import { ensureAppAssets, fetchSiteAssets, isSiteAssets, type SiteAsset } from '@/lib/appMirror';
-import { sha256Hex, uploadToServers, type BlossomServerResult } from '@/lib/blossomMulti';
-import { parseNest, type Egg } from '@/lib/egg';
-import { NAMED_SITE_KIND, rebuildNamedSiteManifest, type SitePath } from '@/lib/nsite';
+import { ensureAppAssets, fetchSiteAssets, isSiteAssets, type SiteAssets } from '@/lib/appMirror';
+import { sha256Hex, uploadToServers } from '@/lib/blossomMulti';
+import { ANSWER_SITE_TAG, NEST_ID, answerSiteId, nestAddress, parseNest, type Egg } from '@/lib/egg';
+import { NAMED_SITE_KIND, buildNamedSiteManifest, type SitePath } from '@/lib/nsite';
 import { renderAnswerOgImage } from '@/lib/ogImage';
-import { LOOKUP_RELAYS, answerGatewayUrl, answerPaths, answerSlug, nestGatewayUrl } from '@/lib/siteConfig';
-import { renderAnswerAppHtml } from '@/lib/staticAnswer';
+import { LOOKUP_RELAYS, answerGatewayUrl, nestGatewayUrl } from '@/lib/siteConfig';
+import { isAnswerPageLive, renderAnswerAppHtml } from '@/lib/staticAnswer';
 import { useAppContext } from './useAppContext';
 import { useCurrentUser } from './useCurrentUser';
 import { useNostrPublish } from './useNostrPublish';
 
-export type AnswerStep = 'idle' | 'drawing' | 'uploading' | 'announcing' | 'posting' | 'done' | 'error';
+export type AnswerStep =
+  | 'idle'
+  | 'drawing'
+  | 'uploading'
+  | 'announcing'
+  | 'waiting'
+  | 'posting'
+  | 'done'
+  /** The answer site is published but the gateway hasn't served it yet; the note is on hold. */
+  | 'stalled'
+  | 'error';
 
 export interface PublishAnswerResult {
   answerUrl: string;
   note: NostrEvent;
+}
+
+interface PendingNote {
+  egg: Egg;
+  answer: string;
+  answerUrl: string;
 }
 
 interface AnswerState {
@@ -29,79 +45,71 @@ interface AnswerState {
   failedServers: string[];
   error: string | null;
   result: PublishAnswerResult | null;
+  /** Set while `step === 'stalled'`: the note that still needs posting. */
+  pending: PendingNote | null;
 }
 
-const IDLE: AnswerState = { step: 'idle', failedServers: [], error: null, result: null };
+const IDLE: AnswerState = { step: 'idle', failedServers: [], error: null, result: null, pending: null };
 
-interface AssetIndex {
-  scripts: string[];
-  styles: string[];
-  /** Assets that must be added to the manifest (the live build's; empty for the pinned one). */
-  extraPaths: SitePath[];
-}
+/** How long to wait for the gateway to serve a fresh answer site before holding the note. */
+const LIVE_TIMEOUT_MS = 120_000;
+const LIVE_RETRY_TIMEOUT_MS = 30_000;
 
 function newest(events: NostrEvent[]): NostrEvent | undefined {
   return events.reduce<NostrEvent | undefined>((best, e) => (!best || e.created_at > best.created_at ? e : best), undefined);
 }
 
-/** Server URLs from a manifest's `server` tags, followed by `extra`, deduped. */
-function manifestServers(manifest: NostrEvent, extra: string[]): string[] {
-  const urls = new Set<string>();
-  for (const [name, value] of manifest.tags) {
-    if (name !== 'server' || !value) continue;
-    try {
-      const url = new URL(value);
-      if (url.protocol === 'https:') urls.add(url.toString());
-    } catch {
-      // Ignore malformed server tags
-    }
-  }
-  for (const server of extra) urls.add(server);
-  return Array.from(urls);
+function truncate(value: string, max: number): string {
+  const chars = Array.from(value.replace(/\s+/g, ' ').trim());
+  return chars.length > max ? `${chars.slice(0, max).join('')}…` : chars.join('');
 }
 
 /**
- * The app build the nest already pins: its `/site-assets.json` blob, fetched
- * straight from Blossom and verified against the manifest hash. Fallback for
- * when the live app's asset index can't be loaded; needs no new asset paths.
+ * Poll the gateway until it serves this answer's baked page. Clients unfurl a
+ * link the moment they see the note and cache the result, so the note must not
+ * go out while the gateway would still answer with a 404/fallback page. The
+ * first check waits a few seconds so the gateway doesn't look the brand-new
+ * site up before the relays have the manifest.
  */
-async function pinnedAssetIndex(manifest: NostrEvent, servers: string[]): Promise<AssetIndex | null> {
-  const sha = manifest.tags.find(([name, path]) => name === 'path' && path === '/site-assets.json')?.[2];
+async function waitForAnswerPage(url: string, eggId: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let delay = 3000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+      if (response.ok && isAnswerPageLive(await response.text(), eggId)) return true;
+    } catch {
+      // Gateway hiccup — keep polling
+    }
+    delay = Math.min(delay + 2000, 10_000);
+  }
+  return false;
+}
+
+/**
+ * The app build the nest pins: its `/site-assets.json` blob, fetched straight
+ * from Blossom and verified against the manifest hash. Fallback for when the
+ * live app's asset index can't be loaded (e.g. publishing from a non-root host).
+ */
+async function pinnedSiteAssets(nestManifest: NostrEvent, servers: string[], owner: string): Promise<SiteAssets | null> {
+  const sha = nestManifest.tags.find(([name, path]) => name === 'path' && path === '/site-assets.json')?.[2];
   if (!sha || !/^[0-9a-f]{64}$/.test(sha)) return null;
-  for (const server of manifestServers(manifest, servers)) {
+  const candidates = new Set(servers);
+  for (const [name, value] of nestManifest.tags) if (name === 'server' && value?.startsWith('https://')) candidates.add(value);
+  for (const server of candidates) {
     try {
       const response = await fetch(new URL(`/${sha}`, server), { signal: AbortSignal.timeout(8000) });
       if (!response.ok) continue;
       const buffer = await response.arrayBuffer();
       if ((await sha256Hex(buffer)) !== sha) continue;
       const data: unknown = JSON.parse(new TextDecoder().decode(buffer));
-      if (!isSiteAssets(data)) continue;
-      return { scripts: data.scripts, styles: data.styles, extraPaths: [] };
+      if (isSiteAssets(data)) return { ...data, assetBase: nestGatewayUrl(owner) };
     } catch {
       // Try the next server
     }
   }
   return null;
-}
-
-/**
- * Answers to one nest are published one at a time: each rebuilds the nest
- * manifest from the previous one, so two concurrent rebuilds would drop each
- * other's `/a/<slug>` paths.
- */
-const nestLocks = new Map<string, Promise<unknown>>();
-/** The manifest we last published per nest, in case a relay still serves an older one. */
-const lastManifests = new Map<string, NostrEvent>();
-
-function exclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const run = (nestLocks.get(key) ?? Promise.resolve()).catch(() => undefined).then(fn);
-  nestLocks.set(key, run);
-  run
-    .finally(() => {
-      if (nestLocks.get(key) === run) nestLocks.delete(key);
-    })
-    .catch(() => undefined);
-  return run;
 }
 
 interface AnswerInput {
@@ -111,14 +119,18 @@ interface AnswerInput {
 }
 
 /**
- * The owner answers (hatches) an egg:
+ * The owner answers (hatches) an egg — like マシュマロ, the answer link shows
+ * the question as its card:
  *
- * 1. draw the answer OG card and bake `/a/<slug>.html` (the app + OG meta),
- * 2. add both to the nest's NIP-5A manifest so the gateway serves them,
- * 3. only then post the kind 1 answer note linking to that page, so the link
- *    unfurls as soon as anyone sees the note.
+ * 1. draw the question card (PNG) and upload it to Blossom,
+ * 2. bake the answer page and publish it as the answer's own NIP-5A named site
+ *    (`d` = `q` + 12 hex of the egg id) — a brand-new site, so no gateway holds
+ *    a stale copy of it,
+ * 3. wait until the gateway actually serves it, then post the kind 1 answer
+ *    note linking to it. If the gateway is slow the note is held (`stalled`)
+ *    and can be posted later with `postNote`.
  */
-export function usePublishAnswer(nestId: string | undefined) {
+export function usePublishAnswer(nestId: string = NEST_ID) {
   const { nostr } = useNostr();
   const { user } = useCurrentUser();
   const { config } = useAppContext();
@@ -128,10 +140,40 @@ export function usePublishAnswer(nestId: string | undefined) {
 
   const reset = useCallback(() => setState(IDLE), []);
 
-  const publishNow = useCallback(
-    async ({ egg, content, ownerName }: AnswerInput): Promise<PublishAnswerResult> => {
+  const fail = useCallback((err: unknown) => {
+    console.error('Answer publish failed:', err);
+    setState((prev) => ({ ...prev, step: 'error', error: err instanceof Error ? err.message : String(err) }));
+  }, []);
+
+  /** Post the kind 1 note for an answer site that is (or is assumed to be) live. */
+  const sendNote = useCallback(
+    async ({ egg, answer, answerUrl }: PendingNote): Promise<PublishAnswerResult> => {
+      if (!user) throw new Error('Only the nest owner can hatch eggs');
+      const owner = user.pubkey;
+      setState((prev) => ({ ...prev, step: 'posting' }));
+      const note = await publishEvent(
+        buildAnswerNoteTemplate({ owner, nestId, egg: { id: egg.id, pubkey: egg.pubkey }, content: answer, answerUrl }),
+      );
+
+      queryClient.setQueryData<Egg[]>(['nostr', 'clutch', owner, nestId], (eggs) =>
+        eggs?.map((e) =>
+          e.id === egg.id ? { ...e, hatch: { id: note.id, content: answer, url: answerUrl, createdAt: note.created_at } } : e,
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'clutch', owner, nestId] });
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'recent-hatches'] });
+
+      const result = { answerUrl, note };
+      setState((prev) => ({ ...prev, step: 'done', result, pending: null }));
+      return result;
+    },
+    [user, nestId, publishEvent, queryClient],
+  );
+
+  const publish = useCallback(
+    async ({ egg, content, ownerName }: AnswerInput): Promise<PublishAnswerResult | null> => {
       try {
-        if (!user || !nestId) throw new Error('Only the nest owner can hatch eggs');
+        if (!user) throw new Error('Only the nest owner can hatch eggs');
         const owner = user.pubkey;
         const answer = content.trim();
         if (!answer) throw new Error('An answer cannot be empty');
@@ -140,123 +182,134 @@ export function usePublishAnswer(nestId: string | undefined) {
         const failed = new Set<string>();
         const upload = async (blob: Blob, name: string, type: string) => {
           const result = await uploadToServers({ blob, name, type, servers, signer: user.signer });
-          const rejected: BlossomServerResult[] = result.results.filter((r) => !r.ok);
-          for (const r of rejected) failed.add(r.server);
+          for (const r of result.results) if (!r.ok) failed.add(r.server);
           setState((prev) => ({ ...prev, failedServers: Array.from(failed) }));
           return result;
         };
 
         setState({ ...IDLE, step: 'drawing' });
-        const lockKey = `${owner}:${nestId}`;
-        const fetched = await nostr.query([{ kinds: [NAMED_SITE_KIND], authors: [owner], '#d': [nestId], limit: 1 }], {
-          signal: AbortSignal.timeout(8000),
-        });
-        const known = lastManifests.get(lockKey);
-        const manifest = newest(known ? [...fetched, known] : fetched);
-        const nest = manifest ? parseNest(manifest) : null;
-        if (!manifest || !nest || manifest.pubkey !== owner) throw new Error('巣のマニフェストが見つかりませんでした');
+        const nestEvents = await nostr.query(
+          [{ kinds: [NAMED_SITE_KIND], authors: [owner], '#d': [nestId], limit: 1 }],
+          { signal: AbortSignal.timeout(8000) },
+        );
+        const nestManifest = newest(nestEvents);
+        const nest = nestManifest ? parseNest(nestManifest) : null;
+        if (!nestManifest || !nest) throw new Error('質問箱が見つかりませんでした');
 
-        const slug = answerSlug(egg.id);
-        const paths = answerPaths(slug);
-        const nestUrl = nestGatewayUrl(owner, nestId);
-        const answerUrl = answerGatewayUrl(owner, nestId, egg.id);
+        const siteId = answerSiteId(egg.id);
+        const answerUrl = answerGatewayUrl(owner, egg.id);
 
+        // The question card. Its Blossom URL becomes og:image: immutable, and
+        // independent of any gateway being up or holding a fresh manifest.
         const og = await upload(
           await renderAnswerOgImage({ question: egg.content, ownerName, nestTitle: nest.title }),
-          `${slug}.png`,
+          `${siteId}.png`,
           'image/png',
         );
 
         setState((prev) => ({ ...prev, step: 'uploading' }));
-        // Prefer the live app build: a nest published before answer pages
-        // existed pins an app that has no /a/<slug>.html route. Hashed asset
-        // names let both builds live side by side in one manifest. Fall back to
-        // the nest's pinned build when the live index is unreachable.
-        let assets: AssetIndex | null = null;
+        // Prefer the live app build; fall back to the build the nest pins.
+        let siteAssets: SiteAssets | null = null;
         try {
-          const live = await fetchSiteAssets();
-          await ensureAppAssets({ assets: live.assets, servers, signer: user.signer, assetBase: live.assetBase });
-          assets = {
-            scripts: live.scripts,
-            styles: live.styles,
-            extraPaths: live.assets.map((a: SiteAsset) => ({ path: a.path, sha256: a.sha256 })),
-          };
+          siteAssets = await fetchSiteAssets();
         } catch (err) {
-          console.warn('Live app assets unavailable, using the nest\'s pinned build:', err);
-          assets = await pinnedAssetIndex(manifest, servers);
+          console.warn("Live app assets unavailable, using the nest's pinned build:", err);
+          siteAssets = await pinnedSiteAssets(nestManifest, servers, owner);
         }
-        if (!assets) throw new Error('アプリ本体の資産が見つかりませんでした');
+        if (!siteAssets) throw new Error('アプリ本体の資産が見つかりませんでした');
+        await ensureAppAssets({
+          assets: siteAssets.assets,
+          servers,
+          signer: user.signer,
+          assetBase: siteAssets.assetBase,
+        });
+
         const html = renderAnswerAppHtml({
           ownerName,
           nestTitle: nest.title,
           question: egg.content,
           answer,
           canonicalUrl: answerUrl,
-          ogImageUrl: new URL(paths.png, nestUrl).toString(),
+          ogImageUrl: og.url,
           npub: nip19.npubEncode(owner),
-          nestId,
-          answerSlug: slug,
-          scripts: assets.scripts,
-          styles: assets.styles,
+          eggId: egg.id,
+          scripts: siteAssets.scripts,
+          styles: siteAssets.styles,
         });
-        const page = await upload(new Blob([html], { type: 'text/html' }), `${slug}.html`, 'text/html');
+        const page = await upload(new Blob([html], { type: 'text/html' }), 'index.html', 'text/html');
+        const assetIndex = await upload(
+          new Blob(
+            [JSON.stringify({ scripts: siteAssets.scripts, styles: siteAssets.styles, assets: siteAssets.assets })],
+            { type: 'application/json' },
+          ),
+          'site-assets.json',
+          'application/json',
+        );
 
         setState((prev) => ({ ...prev, step: 'announcing' }));
-        const template = await rebuildNamedSiteManifest(manifest, [
-          { path: paths.html, sha256: page.sha256 },
-          { path: paths.png, sha256: og.sha256 },
-          ...assets.extraPaths,
-        ]);
-        // The gateway must find the new blobs: list every server that took both.
-        const listed = new Set(template.tags.filter(([name]) => name === 'server').map(([, url]) => url));
-        const tookBoth = page.results
-          .filter((r) => r.ok && og.results.some((o) => o.ok && o.server === r.server))
-          .map((r) => r.server);
-        for (const server of tookBoth) if (!listed.has(server)) template.tags.push(['server', server]);
-        // A replaceable event must be strictly newer than the one it replaces.
-        const createdAt = Math.max(Math.floor(Date.now() / 1000), manifest.created_at + 1);
-        const newManifest = await publishEvent({ ...template, created_at: createdAt });
-        lastManifests.set(lockKey, newManifest);
+        const paths: SitePath[] = [
+          { path: '/index.html', sha256: page.sha256 },
+          // Unknown paths ride the gateway's /404.html fallback (see usePublishNest).
+          { path: '/404.html', sha256: page.sha256 },
+          { path: '/og.png', sha256: og.sha256 },
+          { path: '/site-assets.json', sha256: assetIndex.sha256 },
+          ...siteAssets.assets.map((asset) => ({ path: asset.path, sha256: asset.sha256 })),
+        ];
+        const template = await buildNamedSiteManifest({
+          identifier: siteId,
+          paths,
+          servers,
+          title: `${ownerName}の巣に届いた卵`,
+          description: truncate(egg.content, 120),
+        });
+        template.tags.push(['t', ANSWER_SITE_TAG], ['a', nestAddress(owner, nestId)]);
+        const manifest = await publishEvent(template);
         try {
-          await nostr.event(newManifest, { relays: LOOKUP_RELAYS, signal: AbortSignal.timeout(5000) });
+          await nostr.event(manifest, { relays: LOOKUP_RELAYS, signal: AbortSignal.timeout(5000) });
         } catch {
           // Lookup relays are an optimization only
         }
 
-        setState((prev) => ({ ...prev, step: 'posting' }));
-        const note = await publishEvent(
-          buildAnswerNoteTemplate({ owner, nestId, egg: { id: egg.id, pubkey: egg.pubkey }, content: answer, answerUrl }),
-        );
-
-        queryClient.setQueryData<Egg[]>(['nostr', 'clutch', owner, nestId], (eggs) =>
-          eggs?.map((e) =>
-            e.id === egg.id ? { ...e, hatch: { id: note.id, content: answer, url: answerUrl, createdAt: note.created_at } } : e,
-          ),
-        );
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'clutch', owner, nestId] });
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'nest', owner, nestId] });
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'recent-hatches'] });
-
-        const result = { answerUrl, note };
-        setState((prev) => ({ ...prev, step: 'done', result }));
-        return result;
+        setState((prev) => ({ ...prev, step: 'waiting' }));
+        const pending: PendingNote = { egg, answer, answerUrl };
+        if (!(await waitForAnswerPage(answerUrl, egg.id, LIVE_TIMEOUT_MS))) {
+          setState((prev) => ({ ...prev, step: 'stalled', pending }));
+          return null;
+        }
+        return await sendNote(pending);
       } catch (err) {
-        console.error('Answer publish failed:', err);
-        setState((prev) => ({ ...prev, step: 'error', error: err instanceof Error ? err.message : String(err) }));
+        fail(err);
         throw err;
       }
     },
-    [user, nestId, config.blossomServerMetadata, config.useAppBlossomServers, nostr, publishEvent, queryClient],
+    [user, nestId, config.blossomServerMetadata, config.useAppBlossomServers, nostr, publishEvent, sendNote, fail],
   );
 
-  const publish = useCallback(
-    (input: AnswerInput): Promise<PublishAnswerResult> => {
-      setState({ ...IDLE, step: 'drawing' });
-      return exclusive(`${user?.pubkey ?? ''}:${nestId ?? ''}`, () => publishNow(input));
+  /**
+   * Post the held note. By default re-check the gateway briefly first; with
+   * `force` post right away (the card may not unfurl until the gateway catches up).
+   */
+  const postNote = useCallback(
+    async (opts: { force?: boolean } = {}): Promise<PublishAnswerResult | null> => {
+      const pending = state.pending;
+      if (!pending) return null;
+      try {
+        if (!opts.force) {
+          setState((prev) => ({ ...prev, step: 'waiting' }));
+          if (!(await waitForAnswerPage(pending.answerUrl, pending.egg.id, LIVE_RETRY_TIMEOUT_MS))) {
+            setState((prev) => ({ ...prev, step: 'stalled' }));
+            return null;
+          }
+        }
+        return await sendNote(pending);
+      } catch (err) {
+        fail(err);
+        throw err;
+      }
     },
-    [publishNow, user?.pubkey, nestId],
+    [state.pending, sendNote, fail],
   );
 
-  const isPending = state.step !== 'idle' && state.step !== 'done' && state.step !== 'error';
-  return { ...state, isPending, publish, reset };
+  const isPending = !['idle', 'done', 'stalled', 'error'].includes(state.step);
+  return { ...state, isPending, publish, postNote, reset };
 }

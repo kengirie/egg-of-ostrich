@@ -12,20 +12,19 @@ import { ThrowEggForm } from '@/components/egg/ThrowEggForm';
 import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useClutch, useNest } from '@/hooks/useEggs';
-import { decodeNpub, isValidNestId } from '@/lib/egg';
+import { NEST_ID, decodeNpub } from '@/lib/egg';
 import { sanitizeUrl } from '@/lib/sanitizeUrl';
 import { nestGatewayUrl } from '@/lib/siteConfig';
 import { cn } from '@/lib/utils';
 import NotFound from './NotFound';
 
-export default function NestPage(props: { npub?: string; nestId?: string }) {
-  const params = useParams<{ npub: string; nestId: string }>();
-  const npub = props.npub ?? params.npub;
-  const nestId = props.nestId ?? params.nestId;
-  const owner = decodeNpub(npub);
+/** A user's one nest (question box): `/<npub>` in the app, `/` on the nest's nsite. */
+export default function NestPage(props: { npub?: string }) {
+  const params = useParams<{ nip19: string }>();
+  const owner = decodeNpub(props.npub ?? params.nip19);
 
-  if (!owner || !nestId || !isValidNestId(nestId)) return <NotFound />;
-  return <Nest owner={owner} nestId={nestId} />;
+  if (!owner) return <NotFound />;
+  return <Nest owner={owner} nestId={NEST_ID} />;
 }
 
 function Nest({ owner, nestId }: { owner: string; nestId: string }) {
@@ -65,12 +64,12 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
       <Layout>
         <div className="sticker mx-auto mt-10 max-w-lg rounded-3xl bg-card p-8 text-center">
           <Ostrich className="mx-auto h-40 w-36" mood="shock" />
-          <h1 className="mt-4 text-2xl font-extrabold">巣が見つからない！</h1>
+          <h1 className="mt-4 text-2xl font-extrabold">質問箱が見つからない！</h1>
           <p className="mt-2 text-muted-foreground">
-            ダチョウが砂に頭を突っこんで探していますが、この巣はまだリレーに届いていないようです。少し待ってから再読み込みしてみてください。
+            ダチョウが砂に頭を突っこんで探していますが、この人の質問箱はまだ無いか、リレーに届いていないようです。少し待ってから再読み込みしてみてください。
           </p>
           <Link to="/new" className="mt-6 inline-block font-extrabold text-primary underline">
-            自分の巣をつくる →
+            自分の質問箱を開く →
           </Link>
         </div>
       </Layout>
@@ -104,7 +103,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
 
       {isOwner ? (
         <section className="mt-8 space-y-6">
-          <ShareLink url={nestGatewayUrl(owner, nestId)} label="この巣のリンク（シェアして卵を集めよう）" />
+          <ShareLink url={nestGatewayUrl(owner)} label="この巣のリンク（シェアして卵を集めよう）" />
           <div role="tablist" className="flex gap-2">
             {(['warm', 'hatched'] as const).map((key) => (
               <button
@@ -157,7 +156,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
 
           <p className="text-center font-extrabold">
             <Link to="/new" className="text-primary underline underline-offset-4">
-              🪺 自分の巣もつくる
+              🪺 自分の質問箱も開く
             </Link>
           </p>
         </section>
