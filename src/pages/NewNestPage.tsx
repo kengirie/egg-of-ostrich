@@ -6,6 +6,7 @@ import { LoginArea } from '@/components/auth/LoginArea';
 import { Button } from '@/components/ui/button';
 import { EggShape } from '@/components/egg/EggShape';
 import { Layout } from '@/components/egg/Layout';
+import { NestNoteForm } from '@/components/egg/NestNoteForm';
 import { Ostrich } from '@/components/egg/Ostrich';
 import { ShareLink } from '@/components/egg/ShareLink';
 import { useAuthor } from '@/hooks/useAuthor';
@@ -85,6 +86,7 @@ export default function NewNestPage() {
             このリンクをシェアすれば、誰でも匿名で卵（質問）を投げこめます。ゲートウェイへの反映に少し時間がかかることがあります。
           </p>
           <ShareLink url={result.gatewayUrl} label="あなたの質問箱のリンク" />
+          <NestNoteForm nestUrl={result.gatewayUrl} />
           <div className="flex flex-wrap justify-center gap-3">
             <Button asChild className="sticker-sm rounded-full font-extrabold">
               <Link to="/">質問一覧へ（回答はここから）</Link>
