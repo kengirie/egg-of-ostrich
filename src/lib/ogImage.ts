@@ -158,19 +158,6 @@ function drawLogo(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
   ctx.restore();
 }
 
-/** A pink sticker label with ink outline; returns its width. */
-function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number): number {
-  const width = Math.min(ctx.measureText(text).width + 28, maxWidth);
-  ctx.fillStyle = TINT;
-  ctx.fillRect(x, y, width, 52);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(x, y, width, 52);
-  ctx.fillStyle = INK;
-  ctx.fillText(text, x + 14, y + 38);
-  return width;
-}
-
 function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Failed to encode OG image'))), 'image/png'),
@@ -196,10 +183,7 @@ export async function renderNestOgImage(opts: { title: string; ownerName: string
   ctx.fillStyle = INK;
   lines.forEach((line, i) => ctx.fillText(line, 70, 250 + i * 84));
 
-  // Owner + call to action
-  ctx.font = `700 34px ${JP_FONT}`;
-  const owner = wrapText((s) => ctx.measureText(s).width, `${opts.ownerName} の巣`, 660, 1)[0] ?? '';
-  drawLabel(ctx, owner, 66, 470, 680);
+  // Call to action (the title already says whose nest it is)
   ctx.font = `700 30px ${JP_FONT}`;
   ctx.fillText('匿名で卵（質問）を投げつけよう', 70, 584);
 

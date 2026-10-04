@@ -86,7 +86,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
             ) : (
               <div className="sticker-sm grid size-14 place-items-center rounded-full bg-secondary"><EggShape className="h-8 w-7" /></div>
             )}
-            <p className="text-lg font-extrabold">{ownerName} の巣</p>
+            <p className="text-lg font-extrabold">{ownerName}</p>
           </div>
           <h1 className="-rotate-1 text-4xl font-black leading-tight break-words sm:text-5xl">{title}</h1>
           {nest.data.description && (

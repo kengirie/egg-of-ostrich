@@ -109,7 +109,7 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
             <div className="sticker-sm grid size-12 place-items-center rounded-full bg-secondary"><EggShape className="h-7 w-6" /></div>
           )}
           <span className="min-w-0">
-            <span className="block text-lg font-extrabold hover:underline">{ownerName} の巣</span>
+            <span className="block text-lg font-extrabold hover:underline">{ownerName}</span>
             <span className="block truncate text-sm font-bold text-muted-foreground">{nestTitle}</span>
           </span>
         </NestLink>
