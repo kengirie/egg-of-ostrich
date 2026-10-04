@@ -6,10 +6,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EggShape } from '@/components/egg/EggShape';
 import { Layout } from '@/components/egg/Layout';
 import { Ostrich } from '@/components/egg/Ostrich';
+import { OwnerInbox } from '@/components/egg/OwnerInbox';
+import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useNest } from '@/hooks/useEggs';
 import { NEST_ID } from '@/lib/egg';
-import { nestGatewayUrl } from '@/lib/siteConfig';
 
 const Index = () => {
   useSeoMeta({
@@ -17,6 +18,9 @@ const Index = () => {
     description: 'ログイン不要・完全匿名で、質問（卵）を投げられる質問箱。',
   });
   const { user } = useCurrentUser();
+  const myNest = useNest(user?.pubkey, NEST_ID);
+  // One nest per user: once it exists the "open" button gives way to its inbox.
+  const canOpenNest = !user || (!myNest.isLoading && !myNest.data);
 
   return (
     <Layout>
@@ -32,11 +36,13 @@ const Index = () => {
             投げつけ合おう。
           </h1>
           <p className="max-w-xl text-lg">ログイン不要・完全匿名で、質問（卵）を投げられる質問箱。</p>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild className="sticker h-14 rounded-full px-8 text-lg font-black transition-transform hover:-rotate-2 hover:scale-105">
-              <Link to="/new">質問箱を開く</Link>
-            </Button>
-          </div>
+          {canOpenNest && (
+            <div className="flex flex-wrap gap-3">
+              <Button asChild className="sticker h-14 rounded-full px-8 text-lg font-black transition-transform hover:-rotate-2 hover:scale-105">
+                <Link to="/new">質問箱を開く</Link>
+              </Button>
+            </div>
+          )}
         </div>
         <div className="relative mx-auto h-72 w-72 sm:h-80 sm:w-80">
           <Ostrich className="absolute inset-0 h-full w-full" />
@@ -46,46 +52,31 @@ const Index = () => {
         </div>
       </section>
 
-      {user && <MyNest pubkey={user.pubkey} />}
+      {user && myNest.isLoading && <Skeleton className="mt-16 h-48 rounded-3xl" />}
+      {user && myNest.data && <MyNestInbox pubkey={user.pubkey} title={myNest.data.title} />}
     </Layout>
   );
 };
 
-function MyNest({ pubkey }: { pubkey: string }) {
-  const nest = useNest(pubkey, NEST_ID);
+/** Your nest's eggs right on the home page: answer or crack them without leaving. */
+function MyNestInbox({ pubkey, title }: { pubkey: string; title: string }) {
+  const author = useAuthor(pubkey);
+  const meta = author.data?.metadata;
   const npub = nip19.npubEncode(pubkey);
+  const ownerName = meta?.display_name || meta?.name || npub.slice(0, 12) + '…';
   return (
-    <section className="mt-16">
-      <h2 className="text-2xl font-black">あなたの質問箱</h2>
-      <div className="mt-4">
-        {nest.isLoading ? (
-          <Skeleton className="h-24 rounded-3xl" />
-        ) : !nest.data ? (
-          <div className="rounded-3xl border-[3px] border-dashed border-border p-6 text-center font-bold text-muted-foreground">
-            まだ質問箱がありません。<Link to="/new" className="text-primary underline">開いてみよう</Link>
-          </div>
-        ) : (
-          <div className="sticker flex flex-wrap items-center gap-4 rounded-3xl bg-card p-4">
-            <EggShape className="h-14 w-12 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <Link to={`/${npub}`} className="block truncate text-lg font-extrabold hover:underline">
-                {nest.data.title}
-              </Link>
-              <a
-                href={nestGatewayUrl(pubkey)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block truncate text-sm text-muted-foreground hover:underline"
-              >
-                nsiteで開く ↗
-              </a>
-            </div>
-            <Link to="/new" className="text-sm font-extrabold text-primary underline">
-              編集
+    <section className="mt-16 space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold text-muted-foreground">あなたの質問箱</p>
+          <h2 className="truncate text-3xl font-black">
+            <Link to={`/${npub}`} className="hover:underline">
+              {title}
             </Link>
-          </div>
-        )}
+          </h2>
+        </div>
       </div>
+      <OwnerInbox owner={pubkey} nestId={NEST_ID} ownerName={ownerName} />
     </section>
   );
 }
