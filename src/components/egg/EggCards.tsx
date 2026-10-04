@@ -22,17 +22,15 @@ import { cn } from '@/lib/utils';
 import { EggShape } from './EggShape';
 import { ShareLink } from './ShareLink';
 
-const TILTS = ['rotate-1', '-rotate-1', 'rotate-[0.5deg]', '-rotate-[1.5deg]'];
-
-/** A hatched egg: the anonymous question, and the owner's answer popping out. */
-export function HatchedEggCard({ egg, ownerName, index = 0 }: { egg: Egg; ownerName: string; index?: number }) {
+/** A hatched egg: the anonymous question, and the owner's answer at the same size. */
+export function HatchedEggCard({ egg, ownerName }: { egg: Egg; ownerName: string }) {
   return (
-    <article className={cn('sticker rounded-3xl bg-card p-5 transition-transform hover:rotate-0', TILTS[index % TILTS.length])}>
+    <article className="sticker rounded-3xl bg-card p-5">
       <div className="flex items-start gap-3">
         <EggShape state="whole" className="h-12 w-10 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold text-muted-foreground">匿名の卵 · {timeAgo(egg.createdAt)}</p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-lg font-extrabold">{egg.content}</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-lg font-bold">{egg.content}</p>
         </div>
       </div>
       {egg.hatch && (
@@ -40,7 +38,7 @@ export function HatchedEggCard({ egg, ownerName, index = 0 }: { egg: Egg; ownerN
           <EggShape state="hatched" className="h-12 w-10 shrink-0" />
           <div className="sticker-sm relative min-w-0 flex-1 rounded-2xl bg-secondary px-4 py-3 text-secondary-foreground">
             <p className="text-xs font-bold opacity-80">{ownerName} が孵した · {timeAgo(egg.hatch.createdAt)}</p>
-            <p className="mt-1 whitespace-pre-wrap break-words">{egg.hatch.content}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-lg font-bold">{egg.hatch.content}</p>
             <AnswerLink url={egg.hatch.url} className="mt-2" />
           </div>
         </div>
@@ -181,13 +179,13 @@ export function OwnerEggCard({
         <EggShape state={egg.hatch ? 'hatched' : 'cracked'} className="h-12 w-10 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold text-muted-foreground">匿名の卵 · {timeAgo(egg.createdAt)}</p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-lg font-extrabold">{egg.content}</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-lg font-bold">{egg.content}</p>
         </div>
       </div>
 
       {egg.hatch && !open && (
         <div className="mt-3 rounded-2xl bg-secondary px-4 py-3 text-secondary-foreground">
-          <p className="whitespace-pre-wrap break-words">{egg.hatch.content}</p>
+          <p className="whitespace-pre-wrap break-words text-lg font-bold">{egg.hatch.content}</p>
           <button type="button" onClick={reopen} className="mt-2 text-sm font-bold underline">
             回答を書き直す
           </button>

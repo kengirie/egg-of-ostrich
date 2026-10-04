@@ -124,8 +124,8 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
             <h2 className="text-xl font-extrabold">孵った卵</h2>
             <div className="mt-4">
               <ClutchList loading={clutch.isLoading} error={clutch.isError} onRetry={() => clutch.refetch()} empty="まだ孵った卵はありません。最初の卵を投げてみよう！">
-                {hatched.map((egg, i) => (
-                  <HatchedEggCard key={egg.id} egg={egg} ownerName={ownerName} index={i} />
+                {hatched.map((egg) => (
+                  <HatchedEggCard key={egg.id} egg={egg} ownerName={ownerName} />
                 ))}
               </ClutchList>
             </div>

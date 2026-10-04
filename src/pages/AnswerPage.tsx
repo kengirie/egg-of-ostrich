@@ -128,34 +128,27 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
           </span>
         </NestLink>
 
-        {/* the question, egg style */}
-        <article className="sticker relative -rotate-1 rounded-[3rem] bg-shell px-6 py-8 sm:px-10">
-          <div className="flex items-start gap-4 sm:gap-6">
-            <EggShape
-              state={egg.hatch ? 'hatched' : 'whole'}
-              className={egg.hatch ? 'h-24 w-20 shrink-0' : 'h-24 w-20 shrink-0 motion-safe:animate-wobble'}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-muted-foreground">匿名の卵 · {timeAgo(egg.createdAt)}</p>
-              <h1 className="mt-2 whitespace-pre-wrap break-words text-3xl font-black leading-snug sm:text-4xl">
-                {egg.content}
-              </h1>
-            </div>
+        {/* the question and the answer: same size, same shape, upright */}
+        <article className="sticker flex items-start gap-4 rounded-3xl bg-card px-5 py-5 sm:px-6">
+          <EggShape className={egg.hatch ? 'h-12 w-10 shrink-0' : 'h-12 w-10 shrink-0 motion-safe:animate-wobble'} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-muted-foreground">匿名の卵 · {timeAgo(egg.createdAt)}</p>
+            <h1 className="mt-2 whitespace-pre-wrap break-words text-xl font-bold leading-relaxed">{egg.content}</h1>
           </div>
         </article>
 
         {egg.hatch ? (
-          <article className="flex items-start gap-3 motion-safe:animate-hatch sm:gap-4">
+          <article className="sticker flex items-start gap-4 rounded-3xl bg-secondary px-5 py-5 text-secondary-foreground motion-safe:animate-hatch sm:px-6">
             {avatar ? (
-              <img src={avatar} alt="" className="sticker-sm size-12 shrink-0 rounded-full bg-muted object-cover" />
+              <img src={avatar} alt="" className="sticker-sm size-10 shrink-0 rounded-full bg-muted object-cover" />
             ) : (
               <EggShape state="hatched" className="h-12 w-10 shrink-0" />
             )}
-            <div className="sticker relative min-w-0 flex-1 rotate-[0.5deg] rounded-3xl bg-secondary px-5 py-4 text-secondary-foreground">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-bold opacity-80">
                 {ownerName} が孵した · {timeAgo(egg.hatch.createdAt)}
               </p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-lg">{egg.hatch.content}</p>
+              <p className="mt-2 whitespace-pre-wrap break-words text-xl font-bold leading-relaxed">{egg.hatch.content}</p>
               <AnswerLink url={egg.hatch.url} className="mt-3" />
             </div>
           </article>
@@ -169,7 +162,6 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
       </section>
 
       <section className="mt-12 space-y-4">
-        <h2 className="text-2xl font-black">あなたも卵を投げてみる？</h2>
         <ThrowEggForm owner={owner} nestId={nestId} />
         <p className="text-center font-extrabold">
           <NestLink owner={owner} npub={npub} className="text-primary underline underline-offset-4">
