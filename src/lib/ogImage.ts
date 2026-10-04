@@ -6,12 +6,15 @@
 const W = 1200;
 const H = 630;
 
+// Palette A: cream × ink × one orange (same as the app's tokens in index.css).
 const INK = '#241a12';
-const SAND = '#f7e6bf';
-const SHELL = '#fffaf0';
-const SPECKLE = '#c9b08a';
+const CREAM = '#fbf6ec';
+const SHELL = '#fffdf8';
+const SPECKLE = '#d8cbb6';
 const ORANGE = '#f0591b';
-const PINK = '#f090ac';
+/** Pale orange: the only tint, used for the sun and labels. */
+const TINT = '#fde4d8';
+const GROUND = '#f1e9dc';
 
 const JP_FONT = '"Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Yu Gothic", system-ui, sans-serif';
 
@@ -103,13 +106,13 @@ async function loadFonts(): Promise<void> {
 
 /** Sand + sun + ground. */
 function drawBackdrop(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = SAND;
+  ctx.fillStyle = CREAM;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#ffc94a';
+  ctx.fillStyle = TINT;
   ctx.beginPath();
   ctx.arc(1080, 110, 150, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#e9cf93';
+  ctx.fillStyle = GROUND;
   ctx.fillRect(0, 520, W, 110);
   ctx.strokeStyle = INK;
   ctx.lineWidth = 5;
@@ -136,7 +139,7 @@ function drawLogo(ctx: CanvasRenderingContext2D, x: number, y: number, size: num
 /** A pink sticker label with ink outline; returns its width. */
 function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number): number {
   const width = Math.min(ctx.measureText(text).width + 28, maxWidth);
-  ctx.fillStyle = PINK;
+  ctx.fillStyle = TINT;
   ctx.fillRect(x, y, width, 52);
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3;

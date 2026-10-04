@@ -3,7 +3,7 @@
   "short_name": "Ostrich Eggs",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8ecd0",
+  "background_color": "#fbf6ec",
   "theme_color": "#f0591b",
   "icons": []
 }

@@ -135,103 +135,107 @@
 :root {
   --radius: 1.25rem;
 
-  /* Savanna at noon: sand ground, cream eggshell, ostrich-black ink, flamingo-pink neck. */
-  --background: hsl(42 78% 90%);
-  --foreground: hsl(25 25% 12%);
+  /*
+   * Palette A — cream × ink × one orange. Every surface is cream, every line
+   * and text is ink, and orange (plus its pale tint) is the only colour.
+   */
+  --background: #fbf6ec;
+  --foreground: #241a12;
 
-  --card: hsl(45 100% 97%);
-  --card-foreground: hsl(25 25% 12%);
+  --card: #fffdf8;
+  --card-foreground: #241a12;
 
-  --popover: hsl(45 100% 97%);
-  --popover-foreground: hsl(25 25% 12%);
+  --popover: #fffdf8;
+  --popover-foreground: #241a12;
 
-  --primary: hsl(18 90% 50%);
-  --primary-foreground: hsl(45 100% 98%);
+  --primary: #f0591b;
+  --primary-foreground: #fffdf8;
 
-  --secondary: hsl(340 80% 88%);
-  --secondary-foreground: hsl(340 60% 25%);
+  --secondary: #fde4d8;
+  --secondary-foreground: #241a12;
 
-  --muted: hsl(40 55% 84%);
-  --muted-foreground: hsl(28 22% 32%);
+  --muted: #f1e9dc;
+  --muted-foreground: #6b5d50;
 
-  --accent: hsl(84 45% 78%);
-  --accent-foreground: hsl(90 40% 18%);
+  --accent: #fde4d8;
+  --accent-foreground: #241a12;
 
-  --destructive: hsl(0 72% 45%);
-  --destructive-foreground: hsl(45 100% 98%);
+  --destructive: #c4321b;
+  --destructive-foreground: #fffdf8;
 
-  --border: hsl(25 25% 12%);
-  --input: hsl(25 25% 12%);
-  --ring: hsl(18 90% 45%);
+  --border: #241a12;
+  --input: #241a12;
+  --ring: #f0591b;
 
-  --chart-1: hsl(18 90% 50%);
-  --chart-2: hsl(340 75% 60%);
-  --chart-3: hsl(84 45% 45%);
-  --chart-4: hsl(43 90% 60%);
-  --chart-5: hsl(25 25% 12%);
+  --chart-1: #f0591b;
+  --chart-2: #fde4d8;
+  --chart-3: #6b5d50;
+  --chart-4: #f1e9dc;
+  --chart-5: #241a12;
 
-  --sidebar: hsl(45 100% 97%);
-  --sidebar-foreground: hsl(25 25% 12%);
-  --sidebar-primary: hsl(18 90% 50%);
-  --sidebar-primary-foreground: hsl(45 100% 98%);
-  --sidebar-accent: hsl(40 55% 84%);
-  --sidebar-accent-foreground: hsl(25 25% 12%);
-  --sidebar-border: hsl(25 25% 12%);
-  --sidebar-ring: hsl(18 90% 45%);
+  --sidebar: #fffdf8;
+  --sidebar-foreground: #241a12;
+  --sidebar-primary: #f0591b;
+  --sidebar-primary-foreground: #fffdf8;
+  --sidebar-accent: #f1e9dc;
+  --sidebar-accent-foreground: #241a12;
+  --sidebar-border: #241a12;
+  --sidebar-ring: #f0591b;
 
-  --shell: hsl(45 100% 96%);
-  --speckle: hsl(35 35% 70%);
-  --neck: hsl(340 75% 72%);
+  --shell: #fffdf8;
+  --speckle: #d8cbb6;
+  /* Ostrich skin (neck, head, legs): a neutral, so orange stays the only colour. */
+  --neck: #f1e6d6;
 }
 
 .dark {
-  /* Savanna at midnight. */
-  --background: hsl(240 30% 12%);
-  --foreground: hsl(45 80% 92%);
+  /* The same three roles at night: dark ink ground, cream lines, orange. */
+  --background: #1f1a16;
+  --foreground: #f6efe3;
 
-  --card: hsl(240 25% 18%);
-  --card-foreground: hsl(45 80% 92%);
+  --card: #2a231d;
+  --card-foreground: #f6efe3;
 
-  --popover: hsl(240 25% 18%);
-  --popover-foreground: hsl(45 80% 92%);
+  --popover: #2a231d;
+  --popover-foreground: #f6efe3;
 
-  --primary: hsl(28 95% 58%);
-  --primary-foreground: hsl(240 30% 10%);
+  --primary: #f26a33;
+  --primary-foreground: #1f1a16;
 
-  --secondary: hsl(340 45% 35%);
-  --secondary-foreground: hsl(340 80% 92%);
+  --secondary: #4a2c1f;
+  --secondary-foreground: #f6efe3;
 
-  --muted: hsl(240 20% 24%);
-  --muted-foreground: hsl(45 30% 75%);
+  --muted: #332a23;
+  --muted-foreground: #c9bdae;
 
-  --accent: hsl(84 25% 30%);
-  --accent-foreground: hsl(84 60% 88%);
+  --accent: #4a2c1f;
+  --accent-foreground: #f6efe3;
 
-  --destructive: hsl(0 70% 55%);
-  --destructive-foreground: hsl(0 0% 100%);
+  --destructive: #e0553c;
+  --destructive-foreground: #1f1a16;
 
-  --border: hsl(45 80% 88%);
-  --input: hsl(45 80% 88%);
-  --ring: hsl(28 95% 58%);
+  --border: #f6efe3;
+  --input: #f6efe3;
+  --ring: #f26a33;
 
-  --chart-1: hsl(28 95% 58%);
-  --chart-2: hsl(340 75% 65%);
-  --chart-3: hsl(84 45% 55%);
-  --chart-4: hsl(43 90% 60%);
-  --chart-5: hsl(45 80% 92%);
+  --chart-1: #f26a33;
+  --chart-2: #4a2c1f;
+  --chart-3: #c9bdae;
+  --chart-4: #332a23;
+  --chart-5: #f6efe3;
 
-  --sidebar: hsl(240 25% 18%);
-  --sidebar-foreground: hsl(45 80% 92%);
-  --sidebar-primary: hsl(28 95% 58%);
-  --sidebar-primary-foreground: hsl(240 30% 10%);
-  --sidebar-accent: hsl(240 20% 24%);
-  --sidebar-accent-foreground: hsl(45 80% 92%);
-  --sidebar-border: hsl(45 80% 88%);
-  --sidebar-ring: hsl(28 95% 58%);
+  --sidebar: #2a231d;
+  --sidebar-foreground: #f6efe3;
+  --sidebar-primary: #f26a33;
+  --sidebar-primary-foreground: #1f1a16;
+  --sidebar-accent: #332a23;
+  --sidebar-accent-foreground: #f6efe3;
+  --sidebar-border: #f6efe3;
+  --sidebar-ring: #f26a33;
 
-  --shell: hsl(45 90% 92%);
-  --speckle: hsl(35 30% 62%);
-  --neck: hsl(340 70% 70%);
+  --shell: #f6efe3;
+  --speckle: #b8aa96;
+  --neck: #8a7d70;
 }
 
 @layer base {

@@ -36,12 +36,19 @@ export function useNest(owner: string | undefined, nestId: string | undefined) {
     queryKey: ['nostr', 'nest', owner, nestId],
     enabled: Boolean(owner && nestId),
     queryFn: async ({ signal }) => {
-      const events = await nostr.query(
-        [{ kinds: [NAMED_SITE_KIND], authors: [owner!], '#d': [nestId!], limit: 1 }],
-        { signal: timeout(signal) },
-      );
-      const event = newest(events);
-      return event ? parseNest(event) : null;
+      // Freshly opened relay connections (TLS + NIP-42 AUTH) sometimes answer
+      // with an empty EOSE before they are ready, so look once more before
+      // telling the visitor the nest doesn't exist.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1500));
+        const events = await nostr.query(
+          [{ kinds: [NAMED_SITE_KIND], authors: [owner!], '#d': [nestId!], limit: 1 }],
+          { signal: timeout(signal) },
+        );
+        const event = newest(events);
+        if (event) return parseNest(event);
+      }
+      return null;
     },
   });
 }
