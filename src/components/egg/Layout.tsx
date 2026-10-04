@@ -32,9 +32,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-32 sm:px-6">{children}</main>
 
-      <footer className="relative mx-auto w-full max-w-5xl px-4 pb-6 text-center text-sm font-bold sm:px-6">
-        ダチョウの卵は鶏卵およそ25個分。質問はNostrに公開で残ります。
-      </footer>
     </div>
   );
 }

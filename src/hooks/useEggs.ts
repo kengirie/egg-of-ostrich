@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   APP_DATA_KIND,
   COMMENT_KIND,
-  NEST_ID,
   buildCrackedTemplate,
   crackedListId,
   layAnonymousEgg,
@@ -16,7 +15,7 @@ import {
   type Nest,
 } from '@/lib/egg';
 import { publishAnonymously } from '@/lib/anonPublish';
-import { ANSWER_KIND, ANSWER_T } from '@/lib/answer';
+import { ANSWER_KIND } from '@/lib/answer';
 import { NAMED_SITE_KIND } from '@/lib/nsite';
 import { useCurrentUser } from './useCurrentUser';
 import { useNostrPublish } from './useNostrPublish';
@@ -121,84 +120,6 @@ export function useCrackEgg(nestId: string | undefined) {
       queryClient.setQueryData<Egg[]>(['nostr', 'clutch', user?.pubkey, nestId], (eggs) =>
         eggs?.filter((e) => e.id !== eggId),
       );
-    },
-  });
-}
-
-export interface RecentHatch {
-  owner: string;
-  nestId: string;
-  eggId: string;
-  question: string;
-  answer: string;
-  /** Answer page link (sanitized https). */
-  url: string;
-  createdAt: number;
-}
-
-const HEX64 = /^[0-9a-f]{64}$/;
-
-/**
- * `<owner>`/`<nest id>` from an answer note's `a` tag, or null if malformed.
- * Only the one-nest-per-user format (`d` = `nest`) counts.
- */
-function answerTarget(event: NostrEvent): { owner: string; nestId: string } | null {
-  const address = event.tags.find(([n]) => n === 'a')?.[1] ?? '';
-  const [kind, owner, nestId, ...rest] = address.split(':');
-  if (rest.length || kind !== String(NAMED_SITE_KIND) || !owner || !HEX64.test(owner)) return null;
-  if (nestId !== NEST_ID || owner !== event.pubkey) return null;
-  return { owner, nestId };
-}
-
-/**
- * The global "just hatched" feed: kind 1 answer notes tagged
- * `#eggofostriches`, paired with the egg they quote. Each pair is re-validated
- * with `sortClutch`, so only answers by the nest owner count.
- */
-export function useRecentHatches() {
-  const { nostr } = useNostr();
-  return useQuery<RecentHatch[]>({
-    queryKey: ['nostr', 'recent-hatches'],
-    queryFn: async ({ signal }) => {
-      const answers = (
-        await nostr.query([{ kinds: [ANSWER_KIND], '#t': [ANSWER_T], limit: 60 }], { signal: timeout(signal) })
-      ).filter((e) => e.kind === ANSWER_KIND && answerTarget(e) !== null);
-      if (answers.length === 0) return [];
-
-      const eggIds = Array.from(
-        new Set(
-          answers
-            .map((e) => e.tags.find(([n]) => n === 'q')?.[1])
-            .filter((id): id is string => typeof id === 'string' && HEX64.test(id)),
-        ),
-      );
-      if (eggIds.length === 0) return [];
-      const eggs = await nostr.query([{ kinds: [COMMENT_KIND], ids: eggIds, limit: eggIds.length }], {
-        signal: timeout(signal),
-      });
-
-      const hatches: RecentHatch[] = [];
-      const seen = new Set<string>();
-      for (const answer of answers.sort((a, b) => b.created_at - a.created_at)) {
-        const target = answerTarget(answer);
-        const eggId = answer.tags.find(([n]) => n === 'q')?.[1];
-        if (!target || !eggId || seen.has(eggId)) continue;
-        const eggEvent = eggs.find((e) => e.id === eggId);
-        if (!eggEvent) continue;
-        // Re-run the full egg/answer validation (PoW, root, owner, link) on the pair.
-        const [egg] = sortClutch([eggEvent, answer], target.owner, target.nestId);
-        if (!egg?.hatch) continue;
-        seen.add(eggId);
-        hatches.push({
-          ...target,
-          eggId,
-          question: egg.content,
-          answer: egg.hatch.content,
-          url: egg.hatch.url,
-          createdAt: answer.created_at,
-        });
-      }
-      return hatches.slice(0, 12);
     },
   });
 }

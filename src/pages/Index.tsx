@@ -3,21 +3,18 @@ import { useSeoMeta } from '@unhead/react';
 import { nip19 } from 'nostr-tools';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AnswerLink } from '@/components/egg/EggCards';
 import { EggShape } from '@/components/egg/EggShape';
 import { Layout } from '@/components/egg/Layout';
 import { Ostrich } from '@/components/egg/Ostrich';
-import { useAuthor } from '@/hooks/useAuthor';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useNest, useRecentHatches, type RecentHatch } from '@/hooks/useEggs';
-import { NEST_ID, answerSiteId } from '@/lib/egg';
+import { useNest } from '@/hooks/useEggs';
+import { NEST_ID } from '@/lib/egg';
 import { nestGatewayUrl } from '@/lib/siteConfig';
-import { timeAgo } from '@/lib/time';
 
 const Index = () => {
   useSeoMeta({
     title: 'Egg of Ostriches — 匿名の卵を投げ合おう',
-    description: 'ダチョウの巣に、匿名の卵（質問）を投げ合うNostrの質問箱。巣のリンクはNIP-5Aのnsiteとして発行されます。',
+    description: 'ログイン不要・完全匿名で、質問（卵）を投げられる質問箱。',
   });
   const { user } = useCurrentUser();
 
@@ -26,9 +23,6 @@ const Index = () => {
       {/* hero */}
       <section className="relative grid items-center gap-8 pt-6 md:grid-cols-[1.2fr_1fr]">
         <div className="space-y-5">
-          <p className="sticker-sm inline-block -rotate-3 rounded-full bg-secondary px-4 py-1 font-extrabold text-secondary-foreground">
-            完全匿名 × Nostr × nsite
-          </p>
           <h1 className="text-5xl font-black leading-[1.1] sm:text-6xl">
             ダチョウの巣に、
             <br />
@@ -37,9 +31,7 @@ const Index = () => {
             <br />
             投げつけ合おう。
           </h1>
-          <p className="max-w-xl text-lg">
-            卵＝質問。投げる人はログイン不要、使い捨ての鍵で完全匿名。巣の主があたためて回答すると、卵が孵ります。
-          </p>
+          <p className="max-w-xl text-lg">ログイン不要・完全匿名で、質問（卵）を投げられる質問箱。</p>
           <div className="flex flex-wrap gap-3">
             <Button asChild className="sticker h-14 rounded-full px-8 text-lg font-black transition-transform hover:-rotate-2 hover:scale-105">
               <Link to="/new">質問箱を開く</Link>
@@ -54,25 +46,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* how */}
-      <section className="mt-16 grid gap-5 sm:grid-cols-3">
-        {[
-          { icon: <Ostrich className="h-12 w-10" bobbing={false} />, title: '質問箱を開く', body: 'Nostrでログインして巣（質問箱）をひとつ公開。巣はそのままnsiteになり、専用リンクが発行されます。' },
-          { icon: <EggShape className="h-12 w-10" />, title: '卵を投げる', body: 'リンクを開いた人が質問を書いて投げるだけ。ログイン不要・完全匿名。' },
-          { icon: <EggShape state="hatched" className="h-12 w-10" />, title: '孵す', body: '巣の主が回答すると卵が孵り、質問カードつきの回答リンクがkind 1でタイムラインに流れます。' },
-        ].map((c, i) => (
-          <div key={c.title} className={`sticker rounded-3xl bg-card p-5 ${i % 2 ? 'rotate-1' : '-rotate-1'}`}>
-            <div className="flex h-12 items-center">{c.icon}</div>
-            <h2 className="mt-3 text-xl font-black">
-              {i + 1}. {c.title}
-            </h2>
-            <p className="mt-1">{c.body}</p>
-          </div>
-        ))}
-      </section>
-
       {user && <MyNest pubkey={user.pubkey} />}
-      <RecentHatches />
     </Layout>
   );
 };
@@ -113,46 +87,6 @@ function MyNest({ pubkey }: { pubkey: string }) {
         )}
       </div>
     </section>
-  );
-}
-
-function RecentHatches() {
-  const hatches = useRecentHatches();
-  if (!hatches.isLoading && !hatches.data?.length) return null;
-  return (
-    <section className="mt-16">
-      <h2 className="text-2xl font-black">さいきん孵った卵</h2>
-      <div className="mt-4 grid gap-5 sm:grid-cols-2">
-        {hatches.isLoading
-          ? [0, 1].map((i) => <Skeleton key={i} className="h-36 rounded-3xl" />)
-          : hatches.data!.map((h, i) => <RecentHatchCard key={h.eggId} hatch={h} index={i} />)}
-      </div>
-    </section>
-  );
-}
-
-function RecentHatchCard({ hatch, index }: { hatch: RecentHatch; index: number }) {
-  const author = useAuthor(hatch.owner);
-  const name = author.data?.metadata?.display_name || author.data?.metadata?.name || 'ダチョウ';
-  const npub = nip19.npubEncode(hatch.owner);
-  return (
-    <article
-      className={`sticker rounded-3xl bg-card p-5 transition-transform hover:rotate-0 ${index % 2 ? 'rotate-1' : '-rotate-1'}`}
-    >
-      <Link
-        to={`/${npub}/${answerSiteId(hatch.eggId)}`}
-        className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring"
-      >
-        <p className="line-clamp-3 font-extrabold break-words">{hatch.question}</p>
-        <p className="mt-3 line-clamp-3 rounded-2xl bg-secondary px-3 py-2 break-words text-secondary-foreground">{hatch.answer}</p>
-      </Link>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
-        <Link to={`/${npub}`} className="hover:underline">
-          {name} の巣 · {timeAgo(hatch.createdAt)}
-        </Link>
-        <AnswerLink url={hatch.url} className="text-xs text-foreground" />
-      </div>
-    </article>
   );
 }
 
