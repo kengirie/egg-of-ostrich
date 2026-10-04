@@ -33,6 +33,8 @@ export interface AnswerAppHtmlInput {
    * immutable and doesn't depend on any gateway being up or fresh.
    */
   ogImageUrl: string;
+  /** MIME type of the card: PNG normally, GIF for the rare running-ostrich card. */
+  ogImageType?: 'image/png' | 'image/gif';
   /** npub of the nest owner. */
   npub: string;
   /** The answered egg's id (64 hex). */
@@ -60,6 +62,7 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
   const answer = escapeHtml(input.answer);
   const canonical = escapeHtml(assertHttpUrl(input.canonicalUrl));
   const ogImage = escapeHtml(assertHttpUrl(input.ogImageUrl));
+  const ogImageType = input.ogImageType === 'image/gif' ? 'image/gif' : 'image/png';
   const scripts = input.scripts.map(assertAssetRef);
   const styles = input.styles.map(assertAssetRef);
 
@@ -90,6 +93,7 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
 <meta property="og:description" content="${description}">
 <meta property="og:url" content="${canonical}">
 <meta property="og:image" content="${ogImage}">
+<meta property="og:image:type" content="${ogImageType}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">

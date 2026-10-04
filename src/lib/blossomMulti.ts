@@ -51,6 +51,7 @@ function extensionFor(type: string): string {
   if (type === 'image/webp') return '.webp';
   if (type === 'image/png') return '.png';
   if (type === 'image/jpeg') return '.jpg';
+  if (type === 'image/gif') return '.gif';
   return '';
 }
 

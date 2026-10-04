@@ -14,7 +14,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useCrackEgg } from '@/hooks/useEggs';
-import { usePublishAnswer, type AnswerStep } from '@/hooks/usePublishAnswer';
+import { usePublishAnswer, type AnswerStep, type PublishAnswerResult } from '@/hooks/usePublishAnswer';
 import { useToast } from '@/hooks/useToast';
 import { HATCH_MAX_LENGTH, type Egg } from '@/lib/egg';
 import { timeAgo } from '@/lib/time';
@@ -136,24 +136,26 @@ export function OwnerEggCard({
     try {
       const result = await hatch.publish({ egg, content: answer, ownerName });
       // null = the answer site is up but the gateway is slow; the note is held.
-      if (result) onPosted();
+      if (result) onPosted(result);
     } catch (err) {
       toast({ title: '孵化に失敗…', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }
   };
 
-  const onPosted = () => {
+  const onPosted = ({ variant }: PublishAnswerResult) => {
     setOpen(false);
     onHatched?.();
+    const rare = [variant.golden && '金色の卵', variant.animated && 'ダチョウが走り回るGIF'].filter(Boolean).join('＋');
     toast({
-      title: 'ピヨッ！卵が孵りました',
+      title: rare ? `レア！${rare}のカードが出ました` : 'ピヨッ！卵が孵りました',
       description: '回答リンクつきの kind 1 ノートをタイムラインに投稿しました。',
     });
   };
 
   const onPostHeld = async (force: boolean) => {
     try {
-      if (await hatch.postNote({ force })) onPosted();
+      const result = await hatch.postNote({ force });
+      if (result) onPosted(result);
     } catch (err) {
       toast({ title: '投稿に失敗…', description: err instanceof Error ? err.message : String(err), variant: 'destructive' });
     }

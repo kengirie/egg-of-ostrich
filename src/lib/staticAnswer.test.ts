@@ -34,6 +34,10 @@ describe('renderAnswerAppHtml', () => {
     expect(html).toContain(`<meta property="og:url" content="${SITE}">`);
     expect(html).toContain(`<meta property="og:image" content="${OG}">`);
     expect(html).toContain(`<meta name="twitter:image" content="${OG}">`);
+    expect(html).toContain('<meta property="og:image:type" content="image/png">');
+    expect(renderAnswerAppHtml({ ...BASE, ogImageType: 'image/gif' })).toContain(
+      '<meta property="og:image:type" content="image/gif">',
+    );
     expect(html).toContain('<meta property="og:image:width" content="1200">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain('<meta name="egg:npub" content="npub1abc">');
