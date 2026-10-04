@@ -45,6 +45,9 @@ export default function NewNestPage() {
   const description = descriptionInput ?? existing.data?.description ?? '';
   const [preview, setPreview] = useState<string>();
   const { step, error, result, failedServers, publish, reset } = usePublishNest();
+  // Whether this publish replaced an existing nest — captured at submit, since
+  // the nest query refetches (and finds the new nest) right after publishing.
+  const [wasUpdate, setWasUpdate] = useState(false);
 
   const effectiveTitle = title.trim() || `${ownerName}の巣`;
   const busy = STEPS.some((s) => s.key === step);
@@ -93,7 +96,7 @@ export default function NewNestPage() {
             <Ostrich className="h-40 w-36" />
             <EggShape className="h-20 w-16 motion-safe:animate-wobble" />
           </div>
-          <h1 className="text-3xl font-black">{hasNest ? '質問箱を更新した！' : '質問箱ができた！'}</h1>
+          <h1 className="text-3xl font-black">{wasUpdate ? '質問箱を更新した！' : '質問箱ができた！'}</h1>
           <p className="text-muted-foreground">
             このリンクをシェアすれば、誰でも匿名で卵（質問）を投げこめます。ゲートウェイへの反映に少し時間がかかることがあります。
           </p>
@@ -114,6 +117,7 @@ export default function NewNestPage() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
+    setWasUpdate(hasNest);
     publish({ title: effectiveTitle, description: description.trim(), ownerName });
   };
 
