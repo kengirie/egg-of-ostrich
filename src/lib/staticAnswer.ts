@@ -14,8 +14,10 @@ import {
   NEST_SITE_CSP,
 } from './staticNest';
 
-/** Max characters of the answer shown in og:description before truncating. */
-const DESCRIPTION_MAX = 120;
+/** Max characters of the answer quoted in og:description before truncating. */
+const DESCRIPTION_MAX = 200;
+/** Safety cap on the question used as og:title (clients ellipsize long titles anyway). */
+const TITLE_MAX = 300;
 
 export interface AnswerAppHtmlInput {
   ownerName: string;
@@ -50,8 +52,10 @@ function truncate(value: string, max: number): string {
 export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
   const owner = escapeHtml(input.ownerName);
   const nestTitle = escapeHtml(input.nestTitle);
-  const ogTitle = escapeHtml(`${input.ownerName}の巣に届いた卵`);
-  const description = escapeHtml(truncate(input.answer, DESCRIPTION_MAX));
+  // Same shape as マシュマロ: the question is the title, the description says
+  // whose answer it is and quotes it.
+  const ogTitle = escapeHtml(`${truncate(input.question, TITLE_MAX)} | Egg of Ostriches`);
+  const description = escapeHtml(`${input.ownerName}さんの回答「${truncate(input.answer, DESCRIPTION_MAX)}」`);
   const question = escapeHtml(input.question);
   const answer = escapeHtml(input.answer);
   const canonical = escapeHtml(assertHttpUrl(input.canonicalUrl));
@@ -77,7 +81,7 @@ export function renderAnswerAppHtml(input: AnswerAppHtmlInput): string {
 <meta http-equiv="content-security-policy" content="${NEST_SITE_CSP}">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="${FAVICON_HREF}">
-<title>${ogTitle} | ${nestTitle} | Egg of Ostriches</title>
+<title>${ogTitle}</title>
 <meta name="description" content="${description}">
 <link rel="canonical" href="${canonical}">
 <meta property="og:type" content="article">
@@ -101,7 +105,7 @@ ${scriptTags}
 <div id="root"></div>
 <noscript>
   <div style="max-width:40rem;margin:0 auto;padding:1.5rem;font-family:system-ui,sans-serif">
-    <h1>${ogTitle}</h1>
+    <h1>${nestTitle}</h1>
     <h2>卵（質問）</h2>
     <p style="white-space:pre-wrap">${question}</p>
     <h2>${owner}の回答</h2>

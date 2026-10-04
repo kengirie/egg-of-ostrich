@@ -54,8 +54,8 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
   const egg = clutch.data?.find((e) => e.id.startsWith(prefix));
 
   useSeoMeta({
-    title: `${ownerName}の巣に届いた卵 | ${nestTitle} | Egg of Ostriches`,
-    description: egg?.hatch?.content ?? egg?.content ?? `${ownerName}の巣に届いた匿名の卵（質問）と回答。`,
+    title: egg ? `${egg.content} | Egg of Ostriches` : `${nestTitle} | Egg of Ostriches`,
+    description: egg?.hatch ? `${ownerName}さんの回答「${egg.hatch.content}」` : `${ownerName}の巣に届いた匿名の卵（質問）。`,
   });
 
   if (nest.isLoading || clutch.isLoading) {

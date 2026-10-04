@@ -26,8 +26,11 @@ describe('renderAnswerAppHtml', () => {
     expect(html).toContain('<html lang="ja">');
     expect(html).toContain('<meta property="og:type" content="article">');
     expect(html).toContain('<meta property="og:site_name" content="Egg of Ostriches">');
-    expect(html).toContain('<meta property="og:title" content="ostrichの巣に届いた卵">');
-    expect(html).toContain('<meta property="og:description" content="卵かけご飯です。">');
+    expect(html).toContain('<title>好きな食べ物は？ | Egg of Ostriches</title>');
+    expect(html).toContain('<meta property="og:title" content="好きな食べ物は？ | Egg of Ostriches">');
+    expect(html).toContain('<meta name="twitter:title" content="好きな食べ物は？ | Egg of Ostriches">');
+    expect(html).toContain('<meta property="og:description" content="ostrichさんの回答「卵かけご飯です。」">');
+    expect(html).toContain('<meta name="twitter:description" content="ostrichさんの回答「卵かけご飯です。」">');
     expect(html).toContain(`<meta property="og:url" content="${SITE}">`);
     expect(html).toContain(`<meta property="og:image" content="${OG}">`);
     expect(html).toContain(`<meta name="twitter:image" content="${OG}">`);
@@ -45,7 +48,7 @@ describe('renderAnswerAppHtml', () => {
 
   it('truncates long answers in the description', () => {
     const html = renderAnswerAppHtml({ ...BASE, answer: 'あ'.repeat(300) });
-    expect(html).toContain(`<meta property="og:description" content="${'あ'.repeat(120)}…">`);
+    expect(html).toContain(`<meta property="og:description" content="ostrichさんの回答「${'あ'.repeat(200)}…」">`);
     // The noscript fallback keeps the full answer.
     expect(html).toContain('あ'.repeat(300));
   });
