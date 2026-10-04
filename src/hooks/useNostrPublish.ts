@@ -5,6 +5,9 @@ import { useCurrentUser } from "./useCurrentUser";
 
 import type { NostrEvent } from "@nostrify/nostrify";
 
+/** Shown by Nostr clients as the posting app ("via …"). */
+export const CLIENT_NAME = "Egg of Ostriches";
+
 type EventTemplate = Pick<NostrEvent, 'kind' | 'content'> &
   Partial<Pick<NostrEvent, 'tags' | 'created_at'>>;
 
@@ -21,13 +24,9 @@ export function useNostrPublish(): UseMutationResult<
       if (user) {
         const tags = t.tags ?? [];
 
-        const { hostname } = location;
-        const isLocalhost = hostname === "localhost" || hostname.endsWith(".localhost");
-        const isIpAddress = /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.startsWith("[");
-
-        // Add the client tag if it doesn't exist
-        if (location.protocol === "https:" && !isLocalhost && !isIpAddress && !tags.some(([name]) => name === "client")) {
-          tags.push(["client", location.hostname]);
+        // NIP-89 client tag: clients show it as "via Egg of Ostriches".
+        if (!tags.some(([name]) => name === "client")) {
+          tags.push(["client", CLIENT_NAME]);
         }
 
         const event = await user.signer.signEvent({
