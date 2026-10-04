@@ -5,6 +5,7 @@ import {
   Eye,
   EyeOff,
   Key,
+  KeyRound,
   Loader2,
   FileUp,
   ExternalLink,
@@ -425,8 +426,8 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
           {/* Welcome step — the unified entry point. */}
           {step === 'welcome' && (
             <div className="space-y-5 text-center">
-              <div className="flex size-32 text-6xl bg-primary/10 rounded-full items-center justify-center mx-auto">
-                🔑
+              <div className="flex size-32 bg-primary/10 rounded-full items-center justify-center mx-auto">
+                <KeyRound className="size-14 text-primary" aria-hidden />
               </div>
 
               <div className="space-y-2">

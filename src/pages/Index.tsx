@@ -42,7 +42,7 @@ const Index = () => {
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild className="sticker h-14 rounded-full px-8 text-lg font-black transition-transform hover:-rotate-2 hover:scale-105">
-              <Link to="/new">🪺 質問箱を開く</Link>
+              <Link to="/new">質問箱を開く</Link>
             </Button>
           </div>
         </div>
@@ -57,7 +57,7 @@ const Index = () => {
       {/* how */}
       <section className="mt-16 grid gap-5 sm:grid-cols-3">
         {[
-          { icon: <span className="text-4xl">🪺</span>, title: '質問箱を開く', body: 'Nostrでログインして巣（質問箱）をひとつ公開。巣はそのままnsiteになり、専用リンクが発行されます。' },
+          { icon: <Ostrich className="h-12 w-10" bobbing={false} />, title: '質問箱を開く', body: 'Nostrでログインして巣（質問箱）をひとつ公開。巣はそのままnsiteになり、専用リンクが発行されます。' },
           { icon: <EggShape className="h-12 w-10" />, title: '卵を投げる', body: 'リンクを開いた人が質問を書いて投げるだけ。ログイン不要・完全匿名。' },
           { icon: <EggShape state="hatched" className="h-12 w-10" />, title: '孵す', body: '巣の主が回答すると卵が孵り、質問カードつきの回答リンクがkind 1でタイムラインに流れます。' },
         ].map((c, i) => (
@@ -121,7 +121,7 @@ function RecentHatches() {
   if (!hatches.isLoading && !hatches.data?.length) return null;
   return (
     <section className="mt-16">
-      <h2 className="text-2xl font-black">さいきん孵った卵 🐣</h2>
+      <h2 className="text-2xl font-black">さいきん孵った卵</h2>
       <div className="mt-4 grid gap-5 sm:grid-cols-2">
         {hatches.isLoading
           ? [0, 1].map((i) => <Skeleton key={i} className="h-36 rounded-3xl" />)
@@ -143,8 +143,8 @@ function RecentHatchCard({ hatch, index }: { hatch: RecentHatch; index: number }
         to={`/${npub}/${answerSiteId(hatch.eggId)}`}
         className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring"
       >
-        <p className="line-clamp-3 font-extrabold break-words">🥚 {hatch.question}</p>
-        <p className="mt-3 line-clamp-3 rounded-2xl bg-secondary px-3 py-2 break-words text-secondary-foreground">🐣 {hatch.answer}</p>
+        <p className="line-clamp-3 font-extrabold break-words">{hatch.question}</p>
+        <p className="mt-3 line-clamp-3 rounded-2xl bg-secondary px-3 py-2 break-words text-secondary-foreground">{hatch.answer}</p>
       </Link>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
         <Link to={`/${npub}`} className="hover:underline">

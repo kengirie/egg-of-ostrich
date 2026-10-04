@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -123,7 +123,7 @@ export default function NewNestPage() {
 
   return (
     <Layout>
-      <h1 className="mt-4 -rotate-1 text-4xl font-black sm:text-5xl">{hasNest ? '質問箱を編集 🪺' : '質問箱を開く 🪺'}</h1>
+      <h1 className="mt-4 -rotate-1 text-4xl font-black sm:text-5xl">{hasNest ? '質問箱を編集' : '質問箱を開く'}</h1>
       {hasNest && (
         <p className="mt-3 font-bold text-muted-foreground">
           質問箱はひとり1つ。更新してもリンクと届いた卵はそのままです。
@@ -160,7 +160,7 @@ export default function NewNestPage() {
                 const current = STEPS.findIndex((x) => x.key === step);
                 return (
                   <li key={s.key} className={cn('flex items-center gap-2 font-bold', i > current && 'opacity-40')}>
-                    {i < current ? '✅' : i === current ? <Loader2 className="size-4 animate-spin" /> : '🥚'} {s.label}
+                    {i < current ? <Check className="size-4 text-primary" /> : i === current ? <Loader2 className="size-4 animate-spin" /> : <span className="inline-block size-4 text-center">·</span>} {s.label}
                   </li>
                 );
               })}
@@ -180,7 +180,7 @@ export default function NewNestPage() {
             disabled={busy || existing.isLoading}
             className="sticker-sm h-12 w-full rounded-full text-lg font-extrabold transition-transform hover:-rotate-1 hover:scale-[1.02]"
           >
-            {busy ? <Loader2 className="size-5 animate-spin" /> : '🪺'} {hasNest ? '質問箱を更新する' : '質問箱を公開する'}
+            {busy && <Loader2 className="size-5 animate-spin" />} {hasNest ? '質問箱を更新する' : '質問箱を公開する'}
           </Button>
         </form>
 

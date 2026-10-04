@@ -106,7 +106,7 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
           {avatar ? (
             <img src={avatar} alt="" className="sticker-sm size-12 rounded-full bg-muted object-cover" />
           ) : (
-            <div className="sticker-sm grid size-12 place-items-center rounded-full bg-secondary text-xl">🐦</div>
+            <div className="sticker-sm grid size-12 place-items-center rounded-full bg-secondary"><EggShape className="h-7 w-6" /></div>
           )}
           <span className="min-w-0">
             <span className="block text-lg font-extrabold hover:underline">{ownerName} の巣</span>
@@ -159,7 +159,7 @@ function Answer({ owner, npub, prefix }: { owner: string; npub: string; prefix: 
         <ThrowEggForm owner={owner} nestId={nestId} />
         <p className="text-center font-extrabold">
           <NestLink owner={owner} npub={npub} className="text-primary underline underline-offset-4">
-            🪺 {nestTitle} のほかの卵を見る
+            {nestTitle} のほかの卵を見る
           </NestLink>
         </p>
       </section>

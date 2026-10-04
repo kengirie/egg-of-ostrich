@@ -146,7 +146,7 @@ export function OwnerEggCard({
     setOpen(false);
     onHatched?.();
     toast({
-      title: 'ピヨッ！卵が孵りました 🐣',
+      title: 'ピヨッ！卵が孵りました',
       description: '回答リンクつきの kind 1 ノートをタイムラインに投稿しました。',
     });
   };
@@ -199,7 +199,7 @@ export function OwnerEggCard({
           <ShareLink url={answerUrl} label="回答リンク（シェアすると回答カードが表示されます）" />
           {hatch.result && (
             <p className="text-sm font-bold text-muted-foreground motion-safe:animate-hatch">
-              📣 回答をこのリンクつきの kind 1 ノートとしてタイムラインに投稿しました。
+              回答をこのリンクつきの kind 1 ノートとしてタイムラインに投稿しました。
             </p>
           )}
         </div>
@@ -257,7 +257,7 @@ export function OwnerEggCard({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button type="button" variant="outline" className="sticker-sm rounded-full font-bold" disabled={crack.isPending || hatch.isPending}>
-                  {crack.isPending ? <Loader2 className="size-4 animate-spin" /> : '🔨'} 割る
+                  {crack.isPending && <Loader2 className="size-4 animate-spin" />} 割る
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -278,7 +278,7 @@ export function OwnerEggCard({
               disabled={!answer.trim() || hatch.isPending || hatch.step === 'stalled'}
               className="sticker-sm rounded-full font-extrabold"
             >
-              {hatch.isPending ? <Loader2 className="size-4 animate-spin" /> : '🐣'} 孵化させる
+              {hatch.isPending && <Loader2 className="size-4 animate-spin" />} 孵化させる
             </Button>
           </div>
         </form>

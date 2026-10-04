@@ -75,7 +75,7 @@ export function ThrowEggForm({ owner, nestId }: { owner: string; nestId: string 
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-bold text-muted-foreground">
-              🕶️ 完全匿名：使い捨ての鍵で署名するので、誰が投げたかは誰にもわかりません。
+              完全匿名：使い捨ての鍵で署名するので、誰が投げたかは誰にもわかりません。
               <span className={remaining < 0 ? 'text-destructive' : ''}> 残り{remaining}字</span>
             </p>
             <Button
@@ -88,7 +88,7 @@ export function ThrowEggForm({ owner, nestId }: { owner: string; nestId: string 
                   <Loader2 className="size-5 animate-spin" /> 投げています…
                 </>
               ) : (
-                <>🥚 卵を投げる！</>
+                <>卵を投げる！</>
               )}
             </Button>
           </div>

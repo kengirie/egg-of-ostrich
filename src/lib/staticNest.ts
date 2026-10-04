@@ -36,9 +36,9 @@ export const NEST_SITE_CSP =
   "frame-src 'self' https:; font-src 'self'; base-uri 'self'; manifest-src 'self'; " +
   "connect-src 'self' blob: https: wss:; img-src 'self' data: blob: https:; media-src 'self' https:";
 
-/** An egg emoji favicon, inline so every nest site gets it without an extra blob. */
+/** A drawn egg favicon, inline so every nest/answer site gets it without an extra blob. */
 export const FAVICON_HREF =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%9A%3C/text%3E%3C/svg%3E";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 122'%3E%3Cpath d='M50 6C22 6 8 56 8 76c0 25 19 40 42 40s42-15 42-40C92 56 78 6 50 6z' fill='%23fffaf0' stroke='%23241a12' stroke-width='8'/%3E%3C/svg%3E";
 
 export interface NestAppHtmlInput {
   title: string;

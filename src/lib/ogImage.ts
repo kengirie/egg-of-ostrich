@@ -176,7 +176,7 @@ export async function renderNestOgImage(opts: { title: string; ownerName: string
   const owner = wrapText((s) => ctx.measureText(s).width, `${opts.ownerName} の巣`, 660, 1)[0] ?? '';
   drawLabel(ctx, owner, 66, 470, 680);
   ctx.font = `700 30px ${JP_FONT}`;
-  ctx.fillText('匿名で卵（質問）を投げつけよう 🥚', 70, 584);
+  ctx.fillText('匿名で卵（質問）を投げつけよう', 70, 584);
 
   return toPng(canvas);
 }

@@ -85,7 +85,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
             {avatar ? (
               <img src={avatar} alt="" className="sticker-sm size-14 rounded-full bg-muted object-cover" />
             ) : (
-              <div className="sticker-sm grid size-14 place-items-center rounded-full bg-secondary text-2xl">🐦</div>
+              <div className="sticker-sm grid size-14 place-items-center rounded-full bg-secondary"><EggShape className="h-8 w-7" /></div>
             )}
             <p className="text-lg font-extrabold">{ownerName} の巣</p>
           </div>
@@ -94,8 +94,8 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
             <p className="max-w-2xl whitespace-pre-wrap break-words text-lg">{nest.data.description}</p>
           )}
           <div className="flex flex-wrap gap-2 pt-1 text-sm font-extrabold">
-            <span className="sticker-sm rounded-full bg-shell px-3 py-1">🥚 温め中 {warm.length}</span>
-            <span className="sticker-sm rounded-full bg-secondary px-3 py-1">🐣 孵化 {hatched.length}</span>
+            <span className="sticker-sm rounded-full bg-shell px-3 py-1">温め中 {warm.length}</span>
+            <span className="sticker-sm rounded-full bg-secondary px-3 py-1">孵化 {hatched.length}</span>
           </div>
         </div>
         <Ostrich className="mx-auto hidden h-52 w-44 sm:block" />
@@ -117,7 +117,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
                   tab === key ? 'bg-primary text-primary-foreground -rotate-2' : 'bg-card hover:-rotate-1',
                 )}
               >
-                {key === 'warm' ? `🥚 温め中の卵 (${warm.length})` : `🐣 孵った卵 (${hatched.length})`}
+                {key === 'warm' ? `温め中の卵 (${warm.length})` : `孵った卵 (${hatched.length})`}
               </button>
             ))}
           </div>
@@ -156,7 +156,7 @@ function Nest({ owner, nestId }: { owner: string; nestId: string }) {
 
           <p className="text-center font-extrabold">
             <Link to="/new" className="text-primary underline underline-offset-4">
-              🪺 自分の質問箱も開く
+              自分の質問箱も開く
             </Link>
           </p>
         </section>
