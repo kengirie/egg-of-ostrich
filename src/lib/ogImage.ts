@@ -280,14 +280,10 @@ function layoutQuestion(
   throw new Error('unreachable');
 }
 
-export async function renderAnswerOgImage(opts: {
-  question: string;
-  ownerName: string;
-  nestTitle: string;
-}): Promise<Blob> {
+/** The answer link's card: just the logo, the question in a bubble, and eggs — no names or captions. */
+export async function renderAnswerOgImage(opts: { question: string }): Promise<Blob> {
   const { canvas, ctx } = createCanvas();
   await loadFonts();
-  const measure = (s: string) => ctx.measureText(s).width;
 
   drawBackdrop(ctx);
 
@@ -297,14 +293,6 @@ export async function renderAnswerOgImage(opts: {
   drawEgg(ctx, 945, 482, 0.9, -0.35);
 
   drawLogo(ctx, 60, 72, 44);
-
-  // Nest title next to the logo
-  ctx.font = `700 26px ${JP_FONT}`;
-  const title = wrapText(measure, opts.nestTitle.replace(/\s+/g, ' ').trim(), 390, 1)[0] ?? '';
-  if (title) {
-    ctx.fillStyle = INK;
-    ctx.fillText(`🪺 ${title}`, 530, 68);
-  }
 
   drawBubble(ctx);
 
@@ -316,16 +304,6 @@ export async function renderAnswerOgImage(opts: {
   const blockHeight = lines.length * lineHeight;
   const firstBaseline = BUBBLE.y + (BUBBLE.h - blockHeight) / 2 + lineHeight / 2 + size * 0.36;
   lines.forEach((line, i) => ctx.fillText(line, BUBBLE.x + BUBBLE_PAD_X, firstBaseline + i * lineHeight));
-
-  // Footer: whose nest + hint
-  ctx.font = `700 32px ${JP_FONT}`;
-  const suffix = ' の巣に届いた卵';
-  const name = wrapText(measure, opts.ownerName.replace(/\s+/g, ' ').trim(), 640 - measure(suffix), 1)[0] ?? '';
-  drawLabel(ctx, `${name}${suffix}`, 50, 552, 700);
-  ctx.font = `700 28px ${JP_FONT}`;
-  ctx.textAlign = 'right';
-  ctx.fillText('回答はリンク先で 🐣', 1160, 592);
-  ctx.textAlign = 'start';
 
   return toPng(canvas);
 }

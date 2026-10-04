@@ -202,7 +202,7 @@ export function usePublishAnswer(nestId: string = NEST_ID) {
         // The question card. Its Blossom URL becomes og:image: immutable, and
         // independent of any gateway being up or holding a fresh manifest.
         const og = await upload(
-          await renderAnswerOgImage({ question: egg.content, ownerName, nestTitle: nest.title }),
+          await renderAnswerOgImage({ question: egg.content }),
           `${siteId}.png`,
           'image/png',
         );
